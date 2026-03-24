@@ -1,0 +1,6 @@
+Include/
+Lib/
+Scripts/
+share/
+data/asset/trip_data
+.env
