@@ -4,3 +4,11 @@ Scripts/
 share/
 data/asset/trip_data
 .env
+
+dremio-app/data/
+dremio-app/log/
+dremio-app/run/
+dremio-app/db/
+dremio-app/*.log
+dremio-app/*.out
+.DS_Store
