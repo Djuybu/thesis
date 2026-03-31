@@ -13,3 +13,4 @@ dremio-app/db/
 dremio-app/*.log
 dremio-app/*.out
 .DS_Store
+ar-development/preprocessed_data
