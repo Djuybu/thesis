@@ -14,3 +14,5 @@ dremio-app/*.log
 dremio-app/*.out
 .DS_Store
 ar-development/preprocessed_data
+ar-development/preprocessed-data/ast_statements.json
+ar-development/model_training/reflection_brain.pkl
