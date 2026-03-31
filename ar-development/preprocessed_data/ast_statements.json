@@ -1,0 +1,3678 @@
+[
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 0
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 1
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 2
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 3
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 4
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 5
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 6
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 7
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 8
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 9
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 10
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "fiberid",
+            "plate",
+            "mjd"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 11
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 12
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 13
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 14
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "fiberid",
+            "plate",
+            "mjd"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 15
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 16
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 17
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 18
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 19
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 20
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 21
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "fiberid",
+            "plate",
+            "mjd"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 22
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 23
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 24
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 25
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 26
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 27
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "fiberid",
+            "plate",
+            "mjd"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 28
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 29
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 30
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 31
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 32
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 33
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 34
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 35
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 36
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 37
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 38
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 39
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 40
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 41
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 42
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 43
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 44
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 45
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "fiberid",
+            "plate",
+            "mjd"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 46
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 47
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 48
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 49
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 50
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 51
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 52
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 53
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 54
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 55
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 56
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 57
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 58
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 59
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 60
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 61
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 62
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 63
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 64
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 65
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 66
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 67
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "fiberid",
+            "plate",
+            "mjd"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 68
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 69
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 70
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 71
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 72
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "fiberid",
+            "plate",
+            "mjd"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 73
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 74
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 75
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 76
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 77
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 78
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 79
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 80
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 81
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 82
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 83
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 84
+    },
+    {
+        "tables": [
+            "photozrf"
+        ],
+        "join_columns": [],
+        "columns_where": [
+            "objid"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 85
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 86
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 87
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "fiberid",
+            "plate",
+            "mjd"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 88
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 89
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 90
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 91
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 92
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 93
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 94
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 95
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 96
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 97
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 98
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 99
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 100
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 101
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 102
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 103
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 104
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 105
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 106
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "fiberid",
+            "plate",
+            "mjd"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 107
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 108
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 109
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 110
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 111
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 112
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 113
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 114
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 115
+    },
+    {
+        "tables": [
+            "photozrf"
+        ],
+        "join_columns": [],
+        "columns_where": [
+            "objid"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 116
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 117
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 118
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 119
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 120
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 121
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 122
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 123
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 124
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 125
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 126
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 127
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 128
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 129
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 130
+    },
+    {
+        "tables": [
+            "",
+            "specobjall",
+            "galspecinfo",
+            "galspecextra"
+        ],
+        "join_columns": [
+            "bestobjid",
+            "objid",
+            "specobjid",
+            "specobjid",
+            "specobjid",
+            "specobjid"
+        ],
+        "columns_where": [
+            "class",
+            "zwarning"
+        ],
+        "columns_group": [],
+        "join_types": [
+            "LEFT",
+            "LEFT"
+        ],
+        "timestamp": 131
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 132
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 133
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "fiberid",
+            "plate",
+            "mjd"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 134
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 135
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 136
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 137
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 138
+    },
+    {
+        "tables": [
+            "",
+            "specobjall",
+            "galspecinfo",
+            "galspecextra"
+        ],
+        "join_columns": [
+            "bestobjid",
+            "objid",
+            "specobjid",
+            "specobjid",
+            "specobjid",
+            "specobjid"
+        ],
+        "columns_where": [
+            "class",
+            "zwarning"
+        ],
+        "columns_group": [],
+        "join_types": [
+            "LEFT",
+            "LEFT"
+        ],
+        "timestamp": 139
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "fiberid",
+            "plate",
+            "mjd"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 140
+    },
+    {
+        "tables": [
+            "",
+            "specobjall",
+            "galspecinfo",
+            "galspecextra"
+        ],
+        "join_columns": [
+            "bestobjid",
+            "objid",
+            "specobjid",
+            "specobjid",
+            "specobjid",
+            "specobjid"
+        ],
+        "columns_where": [
+            "class",
+            "zwarning"
+        ],
+        "columns_group": [],
+        "join_types": [
+            "LEFT",
+            "LEFT"
+        ],
+        "timestamp": 141
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 142
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 143
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 144
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 145
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 146
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 147
+    },
+    {
+        "tables": [
+            "",
+            "specobjall",
+            "galspecinfo",
+            "galspecextra"
+        ],
+        "join_columns": [
+            "bestobjid",
+            "objid",
+            "specobjid",
+            "specobjid",
+            "specobjid",
+            "specobjid"
+        ],
+        "columns_where": [
+            "class",
+            "zwarning"
+        ],
+        "columns_group": [],
+        "join_types": [
+            "LEFT",
+            "LEFT"
+        ],
+        "timestamp": 148
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 149
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 150
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 151
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 152
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 153
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 154
+    },
+    {
+        "tables": [
+            "",
+            "specobjall",
+            "galspecinfo",
+            "galspecextra"
+        ],
+        "join_columns": [
+            "bestobjid",
+            "objid",
+            "specobjid",
+            "specobjid",
+            "specobjid",
+            "specobjid"
+        ],
+        "columns_where": [
+            "class",
+            "zwarning"
+        ],
+        "columns_group": [],
+        "join_types": [
+            "LEFT",
+            "LEFT"
+        ],
+        "timestamp": 155
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 156
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 157
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 158
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 159
+    },
+    {
+        "tables": [
+            "",
+            "specobjall",
+            "galspecinfo",
+            "galspecextra"
+        ],
+        "join_columns": [
+            "bestobjid",
+            "objid",
+            "specobjid",
+            "specobjid",
+            "specobjid",
+            "specobjid"
+        ],
+        "columns_where": [
+            "class",
+            "zwarning"
+        ],
+        "columns_group": [],
+        "join_types": [
+            "LEFT",
+            "LEFT"
+        ],
+        "timestamp": 160
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 161
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 162
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 163
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 164
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 165
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 166
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 167
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 168
+    },
+    {
+        "tables": [
+            "",
+            "specobjall",
+            "galspecinfo",
+            "galspecextra"
+        ],
+        "join_columns": [
+            "bestobjid",
+            "objid",
+            "specobjid",
+            "specobjid",
+            "specobjid",
+            "specobjid"
+        ],
+        "columns_where": [
+            "class",
+            "zwarning"
+        ],
+        "columns_group": [],
+        "join_types": [
+            "LEFT",
+            "LEFT"
+        ],
+        "timestamp": 169
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "fiberid",
+            "plate",
+            "mjd"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 170
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 171
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 172
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 173
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 174
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 175
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 176
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 177
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 178
+    },
+    {
+        "tables": [
+            "",
+            "specobjall",
+            "galspecinfo",
+            "galspecextra"
+        ],
+        "join_columns": [
+            "bestobjid",
+            "objid",
+            "specobjid",
+            "specobjid",
+            "specobjid",
+            "specobjid"
+        ],
+        "columns_where": [
+            "class",
+            "zwarning"
+        ],
+        "columns_group": [],
+        "join_types": [
+            "LEFT",
+            "LEFT"
+        ],
+        "timestamp": 179
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 180
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 181
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 182
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 183
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 184
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 185
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 186
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 187
+    },
+    {
+        "tables": [
+            "",
+            "specobjall",
+            "galspecinfo",
+            "galspecextra"
+        ],
+        "join_columns": [
+            "bestobjid",
+            "objid",
+            "specobjid",
+            "specobjid",
+            "specobjid",
+            "specobjid"
+        ],
+        "columns_where": [
+            "class",
+            "zwarning"
+        ],
+        "columns_group": [],
+        "join_types": [
+            "LEFT",
+            "LEFT"
+        ],
+        "timestamp": 188
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 189
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "fiberid",
+            "plate",
+            "mjd"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 190
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 191
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 192
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 193
+    },
+    {
+        "tables": [
+            "",
+            "specobjall",
+            "galspecinfo",
+            "galspecextra"
+        ],
+        "join_columns": [
+            "bestobjid",
+            "objid",
+            "specobjid",
+            "specobjid",
+            "specobjid",
+            "specobjid"
+        ],
+        "columns_where": [
+            "class",
+            "zwarning"
+        ],
+        "columns_group": [],
+        "join_types": [
+            "LEFT",
+            "LEFT"
+        ],
+        "timestamp": 194
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 195
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 196
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 197
+    },
+    {
+        "tables": [
+            "photoobjall",
+            "specobjall"
+        ],
+        "join_columns": [
+            "objid",
+            "bestobjid"
+        ],
+        "columns_where": [
+            "zwarning",
+            "ra",
+            "dec"
+        ],
+        "columns_group": [],
+        "join_types": [],
+        "timestamp": 198
+    },
+    {
+        "tables": [
+            "",
+            "specobjall",
+            "galspecinfo",
+            "galspecextra"
+        ],
+        "join_columns": [
+            "bestobjid",
+            "objid",
+            "specobjid",
+            "specobjid",
+            "specobjid",
+            "specobjid"
+        ],
+        "columns_where": [
+            "class",
+            "zwarning"
+        ],
+        "columns_group": [],
+        "join_types": [
+            "LEFT",
+            "LEFT"
+        ],
+        "timestamp": 199
+    }
+]

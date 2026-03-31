@@ -5,7 +5,7 @@ share/
 data/asset/trip_data
 .env
 ar-development/asset/*
-
+ar-development/snowflake_credentials.json
 dremio-app/data/
 dremio-app/log/
 dremio-app/run/
