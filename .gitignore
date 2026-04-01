@@ -3,6 +3,9 @@ Lib/
 Scripts/
 share/
 data/asset/trip_data
+ar-development/preprocessed_data
+ar-development/preprocessed-data/ast_statements.json
+ar-development/model_training/reflection_brain.pkl
 .env
 ar-development/asset/*
 ar-development/snowflake_credentials.json
@@ -13,6 +16,3 @@ dremio-app/db/
 dremio-app/*.log
 dremio-app/*.out
 .DS_Store
-ar-development/preprocessed_data
-ar-development/preprocessed-data/ast_statements.json
-ar-development/model_training/reflection_brain.pkl
