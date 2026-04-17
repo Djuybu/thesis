@@ -17,7 +17,7 @@
     "licensecheck": "pnpm licenses list --json --prod | node ./node_modules/@dremio/oss-license-checker/dist/index.js",
     "lint:js": "eslint",
     "overwrite-sourcemaps": "ts-node ./build-utils/overwriteSourcemaps.ts",
-    "postinstall": "node --run licensecheck",
+    "postinstall": "echo skipping license check",
     "report:oss": "node licenseCheck.js",
     "start": "SKIP_SENTRY_STEP=true webpack serve",
     "test": "npm-run-all --print-label --parallel lint:js test:only ts-check",

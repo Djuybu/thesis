@@ -25,7 +25,8 @@ import "#oss/uiTheme/less/commonModifiers.less";
 import "#oss/uiTheme/less/Acceleration/Acceleration.less";
 import LayoutInfo from "../LayoutInfo";
 import AccelerationAggregate from "./AccelerationAggregate";
-import { SpinnerOverlay } from "dremio-ui-lib/components";
+import { SpinnerOverlay, Button } from "dremio-ui-lib/components";
+import ApiUtils from "utils/apiUtils/apiUtils";
 
 export class AccelerationBasic extends Component {
   static getFields() {
@@ -34,6 +35,83 @@ export class AccelerationBasic extends Component {
   static validate(values) {
     return AccelerationAggregate.validate(values);
   }
+
+  state = {
+    isGenerating: false,
+  };
+
+  generateAutonomousReflection = async () => {
+    const { dataset, fields } = this.props;
+    const { rawReflections, aggregationReflections } = fields;
+
+    const datasetId = dataset.get("id");
+    const cpath = encodeURIComponent(datasetId);
+
+    try {
+      this.setState({ isGenerating: true });
+      const response = await ApiUtils.fetch(
+        `dataset/${cpath}/reflection/recommendations`,
+        { method: "POST" },
+        2,
+      );
+      const data = await response.json();
+
+      const rawReflection = rawReflections[0];
+      const aggReflection = aggregationReflections[0];
+
+      const dims = data.dimensions || [];
+      const meas = data.measures || [];
+
+      const rawDisplayFields = [...dims, ...meas.map(m => m.name)]
+        .filter((d) => !d.includes("$"))
+        .map((d) => ({ name: d }));
+
+      import("react-dom").then((ReactDOM) => {
+        ReactDOM.unstable_batchedUpdates(() => {
+          if (rawReflection && rawReflection.enabled) {
+            rawReflection.enabled.onChange(rawDisplayFields.length > 0);
+          }
+
+          // Enable agg and set fields
+          const dimensionFields = dims
+            .filter((d) => !d.includes("$"))
+            .map((d) => ({ name: d }));
+          const measureFields = meas
+            .filter((d) => !d.name.includes("$"))
+            .map((d) => ({ name: d.name, measureTypeList: d.aggregations || ["SUM", "COUNT"] }));
+
+          if (aggReflection) {
+            const hasAgg =
+              dimensionFields.length > 0 || measureFields.length > 0;
+            if (aggReflection.enabled) {
+              aggReflection.enabled.onChange(hasAgg);
+            }
+
+            if (hasAgg) {
+              for (let i = fields.columnsDimensions.length - 1; i >= 0; i--) {
+                fields.columnsDimensions.removeField(i);
+              }
+              for (let i = fields.columnsMeasures.length - 1; i >= 0; i--) {
+                fields.columnsMeasures.removeField(i);
+              }
+
+              dimensionFields.forEach((f) =>
+                fields.columnsDimensions.addField({ column: f.name }),
+              );
+              measureFields.forEach((f) =>
+                fields.columnsMeasures.addField({ column: f.name, measureTypeList: f.measureTypeList }),
+              );
+            }
+          }
+        });
+      });
+    } catch (e) {
+      console.error("Failed to generate Autonomous Reflection", e);
+    } finally {
+      this.setState({ isGenerating: false });
+    }
+  };
+
   static propTypes = {
     dataset: PropTypes.instanceOf(Immutable.Map).isRequired,
     reflections: PropTypes.instanceOf(Immutable.Map).isRequired,
@@ -149,6 +227,23 @@ export class AccelerationBasic extends Component {
 
     return (
       <div className={"AccelerationBasic"} data-qa="raw-basic">
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            marginBottom: 10,
+          }}
+        >
+          <Button
+            variant="primary"
+            disabled={this.state.isGenerating}
+            onClick={this.generateAutonomousReflection}
+          >
+            {this.state.isGenerating
+              ? "Generating..."
+              : "Generate Autonomous Reflection"}
+          </Button>
+        </div>
         <div className={"AccelerationBasic__header"}>
           <div
             className={`AccelerationBasic__toggleLayout ${

@@ -63,8 +63,10 @@ import com.dremio.service.namespace.dataset.proto.DatasetConfig;
 import com.dremio.service.namespace.dataset.proto.DatasetType;
 import com.dremio.service.namespace.dataset.proto.RefreshMethod;
 import com.dremio.service.namespace.physicaldataset.proto.AccelerationSettingsDescriptor;
+import com.dremio.service.namespace.proto.EntityId;
 import com.dremio.service.namespace.proto.RefreshPolicyType;
 import com.dremio.service.reflection.ReflectionSettings;
+import com.dremio.service.reflection.analysis.AutonomousReflectionClient;
 import com.dremio.service.users.UserNotFoundException;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
@@ -74,7 +76,9 @@ import com.google.common.collect.ImmutableList;
 import io.protostuff.ByteString;
 import java.io.IOException;
 import java.text.ParseException;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.annotation.security.RolesAllowed;
@@ -91,6 +95,8 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.SecurityContext;
 import org.apache.arrow.vector.types.pojo.Field;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Serves the datasets */
 @RestResource
@@ -98,6 +104,7 @@ import org.apache.arrow.vector.types.pojo.Field;
 @RolesAllowed({"admin", "user"})
 @Path("/dataset/{cpath}")
 public class DatasetResource extends BaseResourceWithAllocator {
+  private static final Logger logger = LoggerFactory.getLogger(DatasetResource.class);
 
   private final Catalog userCatalog;
   private final DatasetVersionMutator datasetVersionMutator;
@@ -352,6 +359,50 @@ public class DatasetResource extends BaseResourceWithAllocator {
     }
 
     reflectionSettings.setReflectionSettings(catalogEntityKey, settings);
+  }
+
+  @POST
+  @Path("reflection/recommendations")
+  @Produces(APPLICATION_JSON)
+  public AutonomousReflectionClient.AIResponse getReflectionRecommendations()
+      throws DatasetNotFoundException, NamespaceException {
+    logger.info("Front-end vừa gửi request tới dataset: {}", datasetPath.toPathString());
+
+    DatasetConfig config = null;
+
+    // Check if the cpath is actually a dataset ID
+    if (datasetPath.toPathList().size() == 1) {
+      try {
+        String idStr = datasetPath.toPathList().get(0);
+        Optional<DatasetConfig> optConfig = namespaceService.getDatasetById(new EntityId(idStr));
+        if (optConfig.isPresent()) {
+          config = optConfig.get();
+        }
+      } catch (Exception e) {
+        // Not a valid ID or not found by ID, ignore and fallback to namespace key
+      }
+    }
+
+    if (config == null) {
+      final CatalogEntityKey catalogEntityKey =
+          CatalogEntityKey.fromNamespaceKey(datasetPath.toNamespaceKey());
+      final DremioTable table = userCatalog.getTable(catalogEntityKey);
+
+      if (table == null) {
+        throw new DatasetNotFoundException(datasetPath);
+      }
+      config = table.getDatasetConfig();
+    }
+
+    AutonomousReflectionClient.AIResponse response =
+        AutonomousReflectionClient.getRecommendations(config);
+    if (response == null) {
+      response = new AutonomousReflectionClient.AIResponse();
+      response.setDimensions(new ArrayList<>());
+      response.setMeasures(new ArrayList<>());
+    }
+    logger.info("Response: {}", response);
+    return response;
   }
 
   /**

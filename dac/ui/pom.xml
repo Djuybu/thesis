@@ -136,7 +136,7 @@
             <!-- Optional configuration which provides for running any npm
               command -->
             <configuration>
-              <arguments>${pnpm.installscript}</arguments>
+              <arguments>install --frozen-lockfile --prefer-offline</arguments>
             </configuration>
           </execution>
           <execution>

@@ -28,7 +28,8 @@ import {
 import AccelerationAggregation from "./AccelerationAggregation";
 import AccelerationRaw from "./AccelerationRaw";
 import "#oss/uiTheme/less/Acceleration/Acceleration.less";
-import { tabsListener } from "dremio-ui-lib/components";
+import { tabsListener, Button } from "dremio-ui-lib/components";
+import ApiUtils from "utils/apiUtils/apiUtils";
 
 export class AccelerationAdvanced extends Component {
   static propTypes = {
@@ -63,6 +64,7 @@ export class AccelerationAdvanced extends Component {
 
   state = {
     activeTab: null,
+    isGenerating: false,
   };
 
   initialReflections = null;
@@ -136,6 +138,72 @@ export class AccelerationAdvanced extends Component {
 
     return found ? "AGGREGATION" : "RAW";
   }
+
+  generateAutonomousReflection = async () => {
+    const {
+      dataset,
+      fields: { rawReflections, aggregationReflections },
+    } = this.props;
+
+    const datasetId = dataset.get("id");
+    const cpath = encodeURIComponent(datasetId);
+
+    try {
+      this.setState({ isGenerating: true });
+      const response = await ApiUtils.fetch(
+        `dataset/${cpath}/reflection/recommendations`,
+        { method: "POST" },
+        2,
+      );
+      const data = await response.json();
+
+      // Clear existing configurations as requested
+      for (let i = rawReflections.length - 1; i >= 0; i--) {
+        rawReflections.removeField(i);
+      }
+      for (let i = aggregationReflections.length - 1; i >= 0; i--) {
+        aggregationReflections.removeField(i);
+      }
+
+      const dims = data.dimensions || [];
+      const meas = data.measures || [];
+
+      // Add new Raw reflection
+      const rawDisplayFields = [...dims, ...meas.map(m => m.name)]
+        .filter((d) => !d.includes("$"))
+        .map((d) => ({ name: d }));
+
+      if (rawDisplayFields.length > 0) {
+        rawReflections.addField({
+          type: "RAW",
+          name: "Autonomous Raw Reflection",
+          enabled: true,
+          displayFields: rawDisplayFields,
+        });
+      }
+
+      // Add new Aggregation reflection
+      const dimensionFields = dims
+        .filter((d) => !d.includes("$"))
+        .map((d) => ({ name: d }));
+      const measureFields = meas
+        .filter((d) => !d.name.includes("$"))
+        .map((d) => ({ name: d.name, measureTypeList: d.aggregations || ["SUM", "COUNT"] }));
+      if (dimensionFields.length > 0 || measureFields.length > 0) {
+        aggregationReflections.addField({
+          type: "AGGREGATION",
+          name: "Autonomous Aggregation Reflection",
+          enabled: true,
+          dimensionFields,
+          measureFields,
+        });
+      }
+    } catch (e) {
+      console.error("Failed to generate Autonomous Reflection", e);
+    } finally {
+      this.setState({ isGenerating: false });
+    }
+  };
 
   areAdvancedReflectionsFieldsEqual(aggregationReflections, rawReflections) {
     // tracks field's dirty state because of issue in redux-form
@@ -266,6 +334,23 @@ export class AccelerationAdvanced extends Component {
             tabIndex={activeTab === "AGGREGATION" ? 0 : -1}
           >
             {laDeprecated("Aggregation Reflections")}
+          </div>
+          <div
+            style={{
+              marginLeft: "auto",
+              display: "flex",
+              alignItems: "center",
+            }}
+          >
+            <Button
+              variant="primary"
+              disabled={this.state.isGenerating}
+              onClick={this.generateAutonomousReflection}
+            >
+              {this.state.isGenerating
+                ? "Generating..."
+                : "Generate Autonomous Reflection"}
+            </Button>
           </div>
         </div>
         {this.renderTableQueries()}

@@ -155,6 +155,76 @@ public class ReflectionSuggester {
   }
 
   private List<ReflectionDetails> getAggReflections(TableStats tableStats) {
+    try {
+      AutonomousReflectionClient.AIResponse aiResponse =
+          AutonomousReflectionClient.getRecommendations(datasetConfig);
+      if (aiResponse != null
+          && (aiResponse.getDimensions() != null || aiResponse.getMeasures() != null)) {
+
+        List<ReflectionDimensionField> dimFields = new java.util.ArrayList<>();
+        if (aiResponse.getDimensions() != null) {
+          for (String dim : aiResponse.getDimensions()) {
+            dimFields.add(
+                new ReflectionDimensionField()
+                    .setName(dim)
+                    .setGranularity(DimensionGranularity.DATE));
+          }
+        }
+
+        List<ReflectionMeasureField> measureFields = new java.util.ArrayList<>();
+        if (aiResponse.getMeasures() != null) {
+          java.util.Map<String, ColumnStats> statsMap = new java.util.HashMap<>();
+          if (tableStats != null && tableStats.getColumns() != null) {
+            for (ColumnStats col : tableStats.getColumns()) {
+              statsMap.put(col.getField().getName(), col);
+            }
+          }
+          for (AutonomousReflectionClient.MeasureItem measItem : aiResponse.getMeasures()) {
+            String meas = measItem.getName();
+            ReflectionMeasureField mf = new ReflectionMeasureField(meas);
+            
+            java.util.List<com.dremio.service.reflection.proto.MeasureType> actualAggs = new java.util.ArrayList<>();
+            if (measItem.getAggregations() != null && !measItem.getAggregations().isEmpty()) {
+              for (String aggStr : measItem.getAggregations()) {
+                try {
+                  actualAggs.add(com.dremio.service.reflection.proto.MeasureType.valueOf(aggStr.toUpperCase()));
+                } catch (IllegalArgumentException e) {
+                  // ignore
+                }
+              }
+            }
+            
+            if (!actualAggs.isEmpty()) {
+              mf.setMeasureTypeList(actualAggs);
+            } else if (statsMap.containsKey(meas)) {
+              mf.setMeasureTypeList(
+                  ReflectionValidator.getDefaultMeasures(
+                      statsMap.get(meas).getField().getTypeFamily()));
+            } else {
+              mf.setMeasureTypeList(
+                  com.google.common.collect.ImmutableList.of(
+                      com.dremio.service.reflection.proto.MeasureType.SUM,
+                      com.dremio.service.reflection.proto.MeasureType.COUNT));
+            }
+            measureFields.add(mf);
+          }
+        }
+
+        ReflectionDetails details =
+            new ReflectionDetails()
+                .setDimensionFieldList(dimFields)
+                .setMeasureFieldList(measureFields);
+
+        logger.info(
+            "Using Autonomous AI generated reflections: Dimensions: {}, Measures: {}",
+            aiResponse.getDimensions(),
+            aiResponse.getMeasures());
+        return java.util.Collections.singletonList(details);
+      }
+    } catch (Exception e) {
+      logger.warn("Autonomous AI suggestion failed, falling back to heuristic", e);
+    }
+
     // get the columns eligible for agg reflection
     List<ColumnStats> columns =
         FluentIterable.from(tableStats.getColumns())
