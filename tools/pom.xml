@@ -31,6 +31,7 @@
   <name>Tools</name>
 
   <modules>
+    <module>aichatbot-plugin</module>
     <module>attach-tool</module>
     <module>testcontainers</module>
     <module>zookeeper-test-runner</module>
