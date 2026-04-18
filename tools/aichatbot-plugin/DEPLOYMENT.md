@@ -66,14 +66,11 @@ Token này dùng cho:
 
 ## 4. Bước B — Clone và cấu hình dremio-mcp
 
-### 4.1 Clone (một lần)
+### 4.1 Lấy mã dremio-mcp
 
-Từ thư mục gốc repo **dremio-oss** (đổi `D:\dev\dremio-oss` thành đường dẫn máy bạn):
+Trên nhánh **thesis `aichatbot`**, mã upstream được **vend** trong **`tools/dremio-mcp/`** (không còn `.git` riêng trong thư mục đó). Chạy MCP trực tiếp từ đường dẫn đó.
 
-```powershell
-cd D:\dev\dremio-oss
-git clone https://github.com/dremio/dremio-mcp.git tools\dremio-mcp
-```
+Khi cần phiên bản mới từ [dremio/dremio-mcp](https://github.com/dremio/dremio-mcp): clone upstream ra thư mục tạm, đồng bộ file vào `tools/dremio-mcp/`, hoặc cấu hình **`git subtree`** / cherry-pick từ thư mục gốc repo thesis (tuỳ quy trình nhóm bạn).
 
 ### 4.2 File cấu hình YAML
 
