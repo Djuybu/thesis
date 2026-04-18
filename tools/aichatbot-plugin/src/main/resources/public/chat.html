@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dremio AI Chat (local LLM)</title>
+  <style>
+    :root { font-family: system-ui, sans-serif; max-width: 52rem; margin: 1rem auto; padding: 0 1rem; }
+    h1 { font-size: 1.25rem; }
+    label { display: block; margin-top: 0.75rem; font-weight: 600; font-size: 0.85rem; }
+    input, textarea, button { width: 100%; box-sizing: border-box; margin-top: 0.25rem; padding: 0.5rem; }
+    textarea { min-height: 6rem; font-family: inherit; }
+    button { margin-top: 1rem; cursor: pointer; background: #2066da; color: #fff; border: 0; border-radius: 4px; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    pre { background: #f4f4f4; padding: 1rem; overflow: auto; border-radius: 4px; font-size: 0.8rem; }
+    .hint { font-size: 0.8rem; color: #555; margin-top: 0.25rem; }
+    a { color: #2066da; }
+  </style>
+</head>
+<body>
+  <h1>Dremio AI Chat — plugin + local LLM</h1>
+  <p class="hint">
+    Cần token Dremio hợp lệ. LLM chạy local (Ollama / LM Studio) qua biến <code>AI_BACKEND_URL</code> trên server plugin.
+    Xem file <code>tools/aichatbot-plugin/README.md</code> trong repo Dremio OSS của bạn.
+  </p>
+
+  <label for="base">URL plugin (mặc định cùng origin)</label>
+  <input id="base" type="text" placeholder="http://localhost:9191" />
+
+  <label for="token">Authorization (Bearer token từ Dremio)</label>
+  <input id="token" type="password" autocomplete="off" placeholder="Bearer eyJ..." />
+  <p class="hint">Lấy token sau khi đăng nhập UI Dremio hoặc qua API login PAT tùy cấu hình OSS của bạn.</p>
+
+  <label for="model">Model (local, ví dụ llama3.2, qwen2.5)</label>
+  <input id="model" type="text" placeholder="llama3.2" />
+
+  <label for="prompt">Câu hỏi</label>
+  <textarea id="prompt" placeholder="Mô tả nguồn dữ liệu hoặc câu hỏi SQL / lakehouse..."></textarea>
+
+  <button id="send" type="button">Gửi</button>
+  <button id="cfg" type="button" style="background:#444;margin-top:0.5rem">Tải cấu hình plugin (/aichat/config)</button>
+
+  <h2 style="margin-top:1.5rem;font-size:1rem">Phản hồi</h2>
+  <pre id="out">(chưa có)</pre>
+
+  <script>
+    (function () {
+      var baseInput = document.getElementById("base");
+      baseInput.value = window.location.origin;
+
+      document.getElementById("cfg").onclick = function () {
+        var base = (baseInput.value || "").replace(/\/$/, "");
+        fetch(base + "/aichat/config").then(function (r) { return r.text(); }).then(function (t) {
+          document.getElementById("out").textContent = t;
+        }).catch(function (e) {
+          document.getElementById("out").textContent = String(e);
+        });
+      };
+
+      document.getElementById("send").onclick = function () {
+        var base = (baseInput.value || "").replace(/\/$/, "");
+        var token = document.getElementById("token").value.trim();
+        var model = document.getElementById("model").value.trim();
+        var prompt = document.getElementById("prompt").value;
+        var out = document.getElementById("out");
+        var btn = document.getElementById("send");
+        if (!token) {
+          out.textContent = "Nhập token.";
+          return;
+        }
+        if (!prompt.trim()) {
+          out.textContent = "Nhập câu hỏi.";
+          return;
+        }
+        btn.disabled = true;
+        out.textContent = "Đang gửi...";
+        var body = { prompt: prompt };
+        if (model) body.model = model;
+        fetch(base + "/aichat/ask", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": token.indexOf("Bearer ") === 0 ? token : "Bearer " + token
+          },
+          body: JSON.stringify(body)
+        }).then(function (r) {
+          return r.text().then(function (t) { return { ok: r.ok, status: r.status, text: t }; });
+        }).then(function (res) {
+          out.textContent = res.status + " " + (res.ok ? "OK" : "") + "\n\n" + res.text;
+        }).catch(function (e) {
+          out.textContent = String(e);
+        }).finally(function () {
+          btn.disabled = false;
+        });
+      };
+    })();
+  </script>
+</body>
+</html>
