@@ -38,5 +38,6 @@ jetbrains_config.js
 CTestTestfile.cmake
 .python-version
 
-# Local clone of upstream MCP server (developers clone separately; not vendored)
-tools/dremio-mcp/
+# Vendored dremio-mcp under tools/ — do not commit local venvs inside it
+tools/dremio-mcp/.venv-gateway/
+tools/dremio-mcp/.venv/
