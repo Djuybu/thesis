@@ -37,3 +37,6 @@ jetbrains_config.js
 .cproject
 CTestTestfile.cmake
 .python-version
+
+# Local clone of upstream MCP server (developers clone separately; not vendored)
+tools/dremio-mcp/

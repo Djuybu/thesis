@@ -22,6 +22,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -72,6 +73,13 @@ public final class AiChatBotPluginServer {
         Integer.parseInt(Optional.ofNullable(System.getenv("AI_REQUEST_TIMEOUT_SECONDS")).orElse("120"));
     final boolean unwrapAnswer =
         Boolean.parseBoolean(Optional.ofNullable(System.getenv("AI_UNWRAP_OPENAI_CONTENT")).orElse("true"));
+    final String mcpHttpBase =
+        stripTrailingSlash(Optional.ofNullable(System.getenv("DREMIO_MCP_HTTP_BASE")).orElse("").trim());
+    final String mcpDefaultPath =
+        normalizeMcpPath(Optional.ofNullable(System.getenv("DREMIO_MCP_HTTP_PATH")).orElse("/mcp"));
+    final int mcpProxyTimeoutSeconds =
+        Integer.parseInt(Optional.ofNullable(System.getenv("DREMIO_MCP_PROXY_TIMEOUT_SECONDS")).orElse("300"));
+    final McpProxyConfig mcpProxyConfig = new McpProxyConfig(mcpHttpBase, mcpDefaultPath, mcpProxyTimeoutSeconds);
 
     final HttpClient httpClient =
         HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(15)).build();
@@ -90,12 +98,16 @@ public final class AiChatBotPluginServer {
             unwrapAnswer);
 
     server.createContext("/health", exchange -> handleHealth(exchange));
-    server.createContext("/aichat/config", exchange -> handleConfig(exchange, llmConfig, dremioBaseUrl));
+    server.createContext(
+        "/aichat/config", exchange -> handleConfig(exchange, llmConfig, dremioBaseUrl, mcpProxyConfig));
     server.createContext(
         "/aichat/context", exchange -> handleContext(exchange, httpClient, dremioBaseUrl));
     server.createContext(
         "/aichat/ask",
         exchange -> handleAsk(exchange, httpClient, dremioBaseUrl, llmConfig));
+    server.createContext(
+        "/aichat/mcp-proxy",
+        exchange -> handleMcpProxy(exchange, httpClient, dremioBaseUrl, mcpProxyConfig));
     server.createContext("/aichat/", exchange -> handleStaticOrOptions(exchange, "aichat/"));
     server.setExecutor(null);
     server.start();
@@ -108,7 +120,31 @@ public final class AiChatBotPluginServer {
     } else {
       System.out.printf("AI backend URL: %s%n", aiBackendUrl);
     }
+    if (mcpHttpBase.isBlank()) {
+      System.out.println("DREMIO_MCP_HTTP_BASE is not set; /aichat/mcp-proxy is disabled.");
+    } else {
+      System.out.printf("Dremio MCP HTTP proxy target: %s (default path %s)%n", mcpHttpBase, mcpDefaultPath);
+    }
     System.out.printf("Open UI: http://localhost:%d/aichat/chat.html%n", port);
+  }
+
+  private static String stripTrailingSlash(String s) {
+    if (s == null || s.isBlank()) {
+      return "";
+    }
+    String out = s.trim();
+    while (out.endsWith("/")) {
+      out = out.substring(0, out.length() - 1);
+    }
+    return out;
+  }
+
+  private static String normalizeMcpPath(String path) {
+    if (path == null || path.isBlank()) {
+      return "/mcp";
+    }
+    String p = path.trim();
+    return p.startsWith("/") ? p : "/" + p;
   }
 
   private static String resolveLlmMode(String envMode, String aiBackendUrl) {
@@ -141,7 +177,8 @@ public final class AiChatBotPluginServer {
     writeJson(exchange, 200, "{\"status\":\"ok\",\"service\":\"dremio-aichatbot-plugin\"}");
   }
 
-  private static void handleConfig(HttpExchange exchange, LlmConfig cfg, String dremioBaseUrl)
+  private static void handleConfig(
+      HttpExchange exchange, LlmConfig cfg, String dremioBaseUrl, McpProxyConfig mcpProxy)
       throws IOException {
     addCors(exchange);
     if (handleOptions(exchange)) {
@@ -162,6 +199,12 @@ public final class AiChatBotPluginServer {
             + "\"aiBackendConfigured\":"
             + (!cfg.aiBackendUrl.isBlank())
             + ","
+            + "\"dremioMcpHttpConfigured\":"
+            + (!mcpProxy.baseUrl.isBlank())
+            + ","
+            + "\"dremioMcpDefaultPath\":\""
+            + escapeJson(mcpProxy.defaultPath)
+            + "\","
             + "\"defaultModel\":\""
             + escapeJson(cfg.defaultAiModel)
             + "\","
@@ -170,8 +213,153 @@ public final class AiChatBotPluginServer {
             + ","
             + "\"unwrapOpenAiContent\":"
             + cfg.unwrapAnswer
+            + ","
+            + "\"mcpProxyTimeoutSeconds\":"
+            + mcpProxy.timeoutSeconds
             + "}";
     writeJson(exchange, 200, body);
+  }
+
+  /**
+   * Validates the caller against Dremio OSS, then forwards the request to a dremio-mcp instance
+   * (see https://github.com/dremio/dremio-mcp) running with {@code --enable-streaming-http}. The
+   * same {@code Authorization} header is forwarded so MCP can verify the bearer token (OAuth /
+   * PAT flow as configured in dremio-mcp).
+   */
+  private static void handleMcpProxy(
+      HttpExchange exchange, HttpClient client, String dremioBaseUrl, McpProxyConfig mcp)
+      throws IOException {
+    addCors(exchange);
+    if (handleOptions(exchange)) {
+      return;
+    }
+    final String method = exchange.getRequestMethod();
+    if (!"GET".equalsIgnoreCase(method) && !"POST".equalsIgnoreCase(method)) {
+      writeJson(exchange, 405, jsonError("Only GET and POST are supported"));
+      return;
+    }
+    if (mcp.baseUrl.isBlank()) {
+      writeJson(exchange, 503, jsonError("DREMIO_MCP_HTTP_BASE is not configured"));
+      return;
+    }
+    final String token = getAuthorization(exchange);
+    if (token == null) {
+      writeJson(exchange, 401, jsonError("Missing Authorization header"));
+      return;
+    }
+    final String rawQuery = exchange.getRequestURI().getRawQuery();
+    final String pathParam = parseQueryParameter(rawQuery, "path");
+    final String path =
+        sanitizeMcpPath(
+            pathParam != null && !pathParam.isBlank() ? pathParam : mcp.defaultPath);
+    if (path == null) {
+      writeJson(exchange, 400, jsonError("Invalid or unsafe path (use ?path=/mcp or similar)"));
+      return;
+    }
+    final String upstreamUrl = mcp.baseUrl + path;
+    if (!upstreamUrl.startsWith("http://") && !upstreamUrl.startsWith("https://")) {
+      writeJson(exchange, 400, jsonError("DREMIO_MCP_HTTP_BASE must be an http(s) URL"));
+      return;
+    }
+    try {
+      URI.create(upstreamUrl);
+    } catch (IllegalArgumentException e) {
+      writeJson(exchange, 400, jsonError("Bad MCP URL"));
+      return;
+    }
+    try {
+      final HttpResponse<String> login = fetchLoginInfo(client, dremioBaseUrl, token);
+      if (login.statusCode() >= 400) {
+        writeJson(exchange, 401, jsonError("Invalid Dremio token"));
+        return;
+      }
+      final HttpRequest.Builder builder =
+          HttpRequest.newBuilder()
+              .uri(URI.create(upstreamUrl))
+              .timeout(Duration.ofSeconds(mcp.timeoutSeconds))
+              .header("Authorization", token);
+      final String accept = exchange.getRequestHeaders().getFirst("Accept");
+      if (accept != null && !accept.isBlank()) {
+        builder.header("Accept", accept);
+      }
+      if ("POST".equalsIgnoreCase(method)) {
+        final String ct = exchange.getRequestHeaders().getFirst(CONTENT_TYPE);
+        if (ct != null && !ct.isBlank()) {
+          builder.header(CONTENT_TYPE, ct);
+        } else {
+          builder.header(CONTENT_TYPE, APPLICATION_JSON_PLAIN);
+        }
+        final byte[] raw = readRequestBodyBytes(exchange.getRequestBody());
+        builder.POST(HttpRequest.BodyPublishers.ofByteArray(raw));
+      } else {
+        builder.GET();
+      }
+      final HttpResponse<String> upstream =
+          client.send(builder.build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+      final String respCt =
+          upstream.headers().firstValue(CONTENT_TYPE).orElse(APPLICATION_JSON_PLAIN);
+      writeRaw(
+          exchange,
+          upstream.statusCode(),
+          upstream.body().getBytes(StandardCharsets.UTF_8),
+          respCt);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      writeJson(exchange, 500, jsonError("Interrupted"));
+    } catch (Exception e) {
+      writeJson(exchange, 502, jsonError("MCP upstream error: " + sanitize(e.getMessage())));
+    }
+  }
+
+  private static String parseQueryParameter(String query, String key) {
+    if (query == null || query.isBlank()) {
+      return null;
+    }
+    for (String pair : query.split("&")) {
+      final int eq = pair.indexOf('=');
+      if (eq <= 0) {
+        continue;
+      }
+      final String k = URLDecoder.decode(pair.substring(0, eq), StandardCharsets.UTF_8);
+      if (key.equals(k)) {
+        return URLDecoder.decode(pair.substring(eq + 1), StandardCharsets.UTF_8);
+      }
+    }
+    return null;
+  }
+
+  /** Allow only safe URL paths for the MCP proxy (no traversal, limited charset). */
+  private static String sanitizeMcpPath(String path) {
+    if (path == null || path.isBlank()) {
+      return null;
+    }
+    String p = path.trim();
+    if (!p.startsWith("/")) {
+      p = "/" + p;
+    }
+    if (p.contains("..") || p.contains("//")) {
+      return null;
+    }
+    if (p.length() > 512) {
+      return null;
+    }
+    for (int i = 0; i < p.length(); i++) {
+      final char c = p.charAt(i);
+      final boolean ok =
+          (c >= 'a' && c <= 'z')
+              || (c >= 'A' && c <= 'Z')
+              || (c >= '0' && c <= '9')
+              || c == '/'
+              || c == '-'
+              || c == '_'
+              || c == '.'
+              || c == '~'
+              || c == '%';
+      if (!ok) {
+        return null;
+      }
+    }
+    return p;
   }
 
   private static void handleContext(HttpExchange exchange, HttpClient client, String dremioBaseUrl)
@@ -596,6 +784,23 @@ public final class AiChatBotPluginServer {
     return new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
   }
 
+  private static byte[] readRequestBodyBytes(InputStream inputStream) throws IOException {
+    return inputStream.readAllBytes();
+  }
+
+  private static void writeRaw(HttpExchange exchange, int statusCode, byte[] body, String contentType)
+      throws IOException {
+    addCors(exchange);
+    final String ct =
+        contentType == null || contentType.isBlank() ? APPLICATION_JSON_PLAIN : contentType;
+    exchange.getResponseHeaders().set(CONTENT_TYPE, ct);
+    exchange.sendResponseHeaders(statusCode, body.length);
+    try (OutputStream os = exchange.getResponseBody()) {
+      os.write(body);
+    }
+    exchange.close();
+  }
+
   private static String extractPrompt(String json) {
     return extractStringValue(json, "prompt");
   }
@@ -710,6 +915,18 @@ public final class AiChatBotPluginServer {
       }
     }
     return null;
+  }
+
+  private static final class McpProxyConfig {
+    final String baseUrl;
+    final String defaultPath;
+    final int timeoutSeconds;
+
+    McpProxyConfig(String baseUrl, String defaultPath, int timeoutSeconds) {
+      this.baseUrl = baseUrl == null ? "" : baseUrl;
+      this.defaultPath = defaultPath == null || defaultPath.isBlank() ? "/mcp" : defaultPath;
+      this.timeoutSeconds = timeoutSeconds;
+    }
   }
 
   private static final class LlmConfig {

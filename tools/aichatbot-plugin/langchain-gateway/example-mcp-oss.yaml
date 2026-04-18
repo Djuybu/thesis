@@ -1,0 +1,10 @@
+# Copy to a path outside the repo or keep local-only, then:
+#   uv run --directory tools/dremio-mcp dremio-mcp-server run -c <this-file> --enable-streaming-http --port 8000
+# Replace pat with a Dremio OSS personal access token (same kind you use for REST).
+
+dremio:
+  uri: "http://localhost:9047"
+  pat: "REPLACE_WITH_YOUR_DREMIO_PAT"
+
+tools:
+  server_mode: FOR_SELF
