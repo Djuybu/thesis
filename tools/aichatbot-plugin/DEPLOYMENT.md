@@ -36,7 +36,7 @@ Tham chiếu thêm: [README.md](README.md) (API, biến môi trường plugin, b
 | **Dremio OSS** | Đang chạy, ví dụ `http://localhost:9047`. Bạn cần **PAT** (Personal Access Token) hoặc token đăng nhập hợp lệ để gọi API. |
 | **Java 11+** | Để chạy JAR plugin sau khi `mvn package`. |
 | **Python 3.11+** | Cho dremio-mcp (khuyến nghị dùng **uv**) và cho gateway (`langchain-gateway`). |
-| **Git** | Clone repo `dremio-mcp` vào `tools/dremio-mcp` (thư mục này **bị .gitignore** trong repo OSS — chỉ dùng cục bộ). |
+| **Git** | Trên nhánh **thesis `aichatbot`**, mã **dremio-mcp** được vend trong `tools/dremio-mcp/`; cập nhật bằng `git pull` trong thư mục đó hoặc đồng bộ từ upstream [dremio/dremio-mcp](https://github.com/dremio/dremio-mcp) khi cần. |
 | **[uv](https://docs.astral.sh/uv/)** | Cài để chạy `dremio-mcp-server` theo hướng dẫn upstream. |
 | **[Ollama](https://ollama.com/)** | Cho LLM local; gateway dùng **ChatOllama** trỏ tới Ollama. |
 
