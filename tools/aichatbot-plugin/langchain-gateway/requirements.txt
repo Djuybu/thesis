@@ -1,0 +1,8 @@
+# Python 3.11+ — stack: LangGraph agent + Ollama + MCP (streamable HTTP via aichatbot mcp-proxy)
+langchain-core>=0.3.41
+langgraph>=0.3.12
+langchain-ollama>=0.2.3
+langchain-mcp-adapters>=0.1.7
+mcp>=1.9.2
+fastapi>=0.115.0
+uvicorn[standard]>=0.34.0
