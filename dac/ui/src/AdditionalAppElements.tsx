@@ -14,4 +14,6 @@
  * limitations under the License.
  */
 
-export const AdditionalAppElements = <></>;
+import { AIChatbot } from "#oss/components/AIChatbot/AIChatbot";
+
+export const AdditionalAppElements = <AIChatbot />;
