@@ -182,18 +182,32 @@ public class ReflectionSuggester {
           for (AutonomousReflectionClient.MeasureItem measItem : aiResponse.getMeasures()) {
             String meas = measItem.getName();
             ReflectionMeasureField mf = new ReflectionMeasureField(meas);
-            
-            java.util.List<com.dremio.service.reflection.proto.MeasureType> actualAggs = new java.util.ArrayList<>();
+
+            java.util.List<com.dremio.service.reflection.proto.MeasureType> actualAggs =
+                new java.util.ArrayList<>();
             if (measItem.getAggregations() != null && !measItem.getAggregations().isEmpty()) {
               for (String aggStr : measItem.getAggregations()) {
+                if ("AVG".equalsIgnoreCase(aggStr)) {
+                  if (!actualAggs.contains(com.dremio.service.reflection.proto.MeasureType.SUM)) {
+                    actualAggs.add(com.dremio.service.reflection.proto.MeasureType.SUM);
+                  }
+                  if (!actualAggs.contains(com.dremio.service.reflection.proto.MeasureType.COUNT)) {
+                    actualAggs.add(com.dremio.service.reflection.proto.MeasureType.COUNT);
+                  }
+                  continue;
+                }
                 try {
-                  actualAggs.add(com.dremio.service.reflection.proto.MeasureType.valueOf(aggStr.toUpperCase()));
+                  com.dremio.service.reflection.proto.MeasureType mt =
+                      com.dremio.service.reflection.proto.MeasureType.valueOf(aggStr.toUpperCase());
+                  if (!actualAggs.contains(mt)) {
+                    actualAggs.add(mt);
+                  }
                 } catch (IllegalArgumentException e) {
                   // ignore
                 }
               }
             }
-            
+
             if (!actualAggs.isEmpty()) {
               mf.setMeasureTypeList(actualAggs);
             } else if (statsMap.containsKey(meas)) {

@@ -157,14 +157,14 @@ public class TestReflectionService {
 
     ReflectionManagerFactory defaultReflectionManagerFactory =
         Mockito.mock(ReflectionManagerFactory.class);
-    ReflectionSettings reflectionSettings = Mockito.mock(ReflectionSettings.class);
+    ReflectionSettings mockSettings = Mockito.mock(ReflectionSettings.class);
     when(config.getInstance(
             eq(ReflectionManagerFactory.REFLECTION_MANAGER_FACTORY),
             eq(ReflectionManagerFactory.class),
             any(ReflectionManagerFactory.class),
             any(ReflectionManagerFactory.class)))
         .thenReturn(defaultReflectionManagerFactory);
-    when(defaultReflectionManagerFactory.newReflectionSettings()).thenReturn(reflectionSettings);
+    when(defaultReflectionManagerFactory.newReflectionSettings()).thenReturn(mockSettings);
 
     when(optionManager.getOption(MATERIALIZATION_CACHE_ENABLED)).thenReturn(true);
     when(optionManager.getOption(AUTO_REBUILD_PLAN)).thenReturn(true);

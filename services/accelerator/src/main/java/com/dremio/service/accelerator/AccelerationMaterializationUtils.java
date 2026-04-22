@@ -35,7 +35,9 @@ import org.slf4j.LoggerFactory;
  * converting them to a list of {@link
  * com.dremio.exec.store.sys.accel.AccelerationListManager.MaterializationInfo}.
  */
-public class AccelerationMaterializationUtils {
+public final class AccelerationMaterializationUtils {
+  private AccelerationMaterializationUtils() {}
+
   private static final Logger logger =
       LoggerFactory.getLogger(AccelerationMaterializationUtils.class);
   private static final Serializer<JoinAnalysis, byte[]> JOIN_ANALYSIS_ABSTRACT_SERIALIZER =

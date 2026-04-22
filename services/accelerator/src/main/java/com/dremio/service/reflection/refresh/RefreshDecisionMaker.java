@@ -81,7 +81,8 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.sql.SqlOperator;
 
-class RefreshDecisionMaker {
+final class RefreshDecisionMaker {
+  private RefreshDecisionMaker() {}
 
   private static final org.slf4j.Logger logger =
       org.slf4j.LoggerFactory.getLogger(RefreshDecisionMaker.class);

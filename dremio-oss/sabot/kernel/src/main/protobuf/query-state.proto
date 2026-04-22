@@ -1,0 +1,49 @@
+/*
+ * Copyright (C) 2017-2019 Dremio Corporation
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+syntax = "proto3";
+
+option java_package = "com.dremio.querystate";
+option optimize_for = SPEED;
+
+option java_generate_equals_and_hash = true;
+option java_multiple_files = true;
+option java_outer_classname = "QueryLifecycleVisibility";
+
+package com.dremio.querystate;
+
+message ActiveQueryState {
+  string query_id = 1;
+  int64 active_duration_millis = 2;
+  bool resources_allocated = 3;
+  ResourceIdentifier allocated_resource_identifier = 4;
+}
+
+message ActiveQueries {
+  repeated ActiveQueryState queries = 1;
+}
+
+message ResourceAllocatedQueries {
+  repeated ResourceAllocationDetails queries = 1;
+}
+
+message ResourceAllocationDetails {
+  string query_id = 1;
+  int64 allocation_waiting_duration_millis = 2;
+}
+
+message ResourceIdentifier {
+  string identifier = 1;
+}

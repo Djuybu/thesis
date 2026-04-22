@@ -264,8 +264,8 @@ public class DependencyGraph {
     queue.addAll(bottomReflections);
     while (!queue.isEmpty()) {
       final ReflectionId current = queue.remove();
-      List<ReflectionId> successors = getSuccessors(current);
-      for (ReflectionId successor : successors) {
+      List<ReflectionId> successorList = getSuccessors(current);
+      for (ReflectionId successor : successorList) {
         batchNumbers.compute(
             successor,
             (k, v) -> {

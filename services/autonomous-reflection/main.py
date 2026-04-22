@@ -62,7 +62,7 @@ class ReflectionBrain:
         if len(known_names) == 0:
             # Fallback if knowledge base is empty
             for col in new_table_columns:
-                suggestions.append({'column': col, 'suggested_type': 'Dimension', 'similarity': 0.0, 'matched_with': 'None'})
+                suggestions.append({'column': col, 'suggested_type': 'None', 'similarity': 0.0, 'matched_with': 'None'})
             return pd.DataFrame(suggestions)
             
         known_embeddings = np.array([v['embedding'] for v in self.knowledge_base.values()])
@@ -79,7 +79,7 @@ class ReflectionBrain:
                 label = "Dimension" if info['dim_score'] >= info['mea_score'] else "Measure"
                 confidence = max_score
             else:
-                label = "Dimension"
+                label = "None"
                 confidence = 0.0
 
             suggestions.append({
@@ -164,7 +164,7 @@ async def predict_schema(req: PredictionRequest):
         dimensions = [c.name for c in req.columns if c.type in ("VARCHAR", "BOOLEAN", "TIMESTAMP")]
         # Create default measure item for the fallback fields
         measures = [
-            MeasurePrediction(name=c.name, aggregations=["SUM", "COUNT"]) 
+            MeasurePrediction(name=c.name, aggregations=["SUM", "AVG"]) 
             for c in req.columns if c.type in ("DOUBLE", "FLOAT", "INTEGER", "DECIMAL")
         ]
         return PredictionResponse(
@@ -182,7 +182,10 @@ async def predict_schema(req: PredictionRequest):
         
         for _, row in df_suggestions.iterrows():
             col_name = row['column']
-            sug_type = row.get('suggested_type', "none").lower()
+            sug_type_raw = row.get('suggested_type')
+            if sug_type_raw is None or pd.isna(sug_type_raw):
+                sug_type_raw = "none"
+            sug_type = str(sug_type_raw).lower()
             
             if "none" in sug_type:
                 # Do not suggest it for dimension or measure
@@ -197,7 +200,7 @@ async def predict_schema(req: PredictionRequest):
                 elif isinstance(aggs_raw, list):
                     agg_list = [str(a).upper() for a in aggs_raw]
                 else:
-                    agg_list = ["SUM", "COUNT"] # Default if not provided
+                    agg_list = ["SUM", "AVG"] # Default if not provided
                     
                 measures.append(MeasurePrediction(name=col_name, aggregations=agg_list))
                 

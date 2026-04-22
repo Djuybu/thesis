@@ -132,6 +132,28 @@ public final class AutonomousReflectionClient {
           }
           // Sử dụng hằng số MAPPER đã đổi tên
           AIResponse aiResponse = MAPPER.readValue(response.toString(), AIResponse.class);
+          if (aiResponse.getMeasures() != null) {
+            for (MeasureItem item : aiResponse.getMeasures()) {
+              if (item.getAggregations() != null) {
+                List<String> newAggs = new ArrayList<>();
+                for (String agg : item.getAggregations()) {
+                  if ("AVG".equalsIgnoreCase(agg)) {
+                    if (!newAggs.contains("SUM")) {
+                      newAggs.add("SUM");
+                    }
+                    if (!newAggs.contains("COUNT")) {
+                      newAggs.add("COUNT");
+                    }
+                  } else {
+                    if (!newAggs.contains(agg.toUpperCase())) {
+                      newAggs.add(agg.toUpperCase());
+                    }
+                  }
+                }
+                item.setAggregations(newAggs);
+              }
+            }
+          }
           logger.info("Received AI reflection recommendations successfully.");
           return aiResponse;
         }

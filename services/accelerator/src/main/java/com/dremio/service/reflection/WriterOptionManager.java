@@ -40,7 +40,7 @@ import org.slf4j.LoggerFactory;
  */
 public class WriterOptionManager {
   private static final Logger logger = LoggerFactory.getLogger(WriterOptionManager.class);
-  public static final WriterOptionManager Instance = new WriterOptionManager();
+  public static final WriterOptionManager INSTANCE = new WriterOptionManager();
 
   public WriterOptions buildWriterOptionForReflectionGoal(
       Integer ringCount,

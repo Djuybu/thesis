@@ -1,0 +1,32 @@
+{
+    "<TABLE_NAME>" : {
+        "properties" : {
+            "id" : { "type" : "integer" },
+            "username" : { "type" : "text" },
+            "creationDate" : {
+                "type" : "date",
+                "format" : "yyyyMMdd'T'HHmmss.SSSZ"
+            },
+            "address" : {
+                "type" : "nested",
+                "properties" : {
+                    "city"   : { "type" : "text" },
+                    "state"  : { "type" : "text" },
+                    "zip"    : { "type" : "integer" },
+                    "street" : { "type" : "text" },
+                    "creationDate" : {
+                        "type" : "date",
+                        "format" : "yyyyMMdd'T'HHmmss.SSSZ"
+                    },
+                    "phones" : {
+                        "type" : "nested",
+                        "properties" : {
+                            "mobile" : { "type" : "long" },
+                            "office" : { "type" : "long" }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

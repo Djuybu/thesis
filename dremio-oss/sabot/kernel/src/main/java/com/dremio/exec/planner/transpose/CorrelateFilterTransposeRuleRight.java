@@ -1,0 +1,87 @@
+/*
+ * Copyright (C) 2017-2019 Dremio Corporation
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.dremio.exec.planner.transpose;
+
+import com.google.common.collect.ImmutableList;
+import org.apache.calcite.plan.RelOptRuleCall;
+import org.apache.calcite.plan.RelRule;
+import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.core.Correlate;
+import org.apache.calcite.rel.core.Filter;
+import org.apache.calcite.rel.core.JoinRelType;
+import org.apache.calcite.rel.rules.TransformationRule;
+import org.apache.calcite.rex.RexInputRef;
+import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.rex.RexShuttle;
+
+/**
+ * This class pulls filters above Correlates, which is useful for reflection matching. It's a copy
+ * and past of JoinFilterTransposeRule and won't be needed after we decorrelate in normalization.
+ */
+public final class CorrelateFilterTransposeRuleRight
+    extends RelRule<CorrelateFilterTransposeRuleRight.Config> implements TransformationRule {
+  private CorrelateFilterTransposeRuleRight(Config config) {
+    super(config);
+  }
+
+  @Override
+  public void onMatch(RelOptRuleCall call) {
+    Correlate correlate = call.rel(0);
+    JoinRelType joinType = correlate.getJoinType();
+    if (joinType.generatesNullsOnRight()) {
+      return;
+    }
+
+    int nFieldsLeft = correlate.getLeft().getRowType().getFieldList().size();
+    Filter filter = call.rel(2);
+    RexNode newFilterCondition =
+        filter
+            .getCondition()
+            .accept(
+                new RexShuttle() {
+                  @Override
+                  public RexNode visitInputRef(RexInputRef inputRef) {
+                    // Adjust index by the left input field count
+                    return new RexInputRef(inputRef.getIndex() + nFieldsLeft, inputRef.getType());
+                  }
+                });
+    RelNode newLeftChild = call.rel(1);
+    RelNode newRightChild = filter.getInput();
+    Correlate newCorrelate =
+        correlate.copy(correlate.getTraitSet(), ImmutableList.of(newLeftChild, newRightChild));
+
+    RelNode transposed = call.builder().push(newCorrelate).filter(newFilterCondition).build();
+    call.transformTo(transposed);
+  }
+
+  public interface Config extends RelRule.Config {
+    Config DEFAULT =
+        EMPTY
+            .withOperandSupplier(
+                b0 ->
+                    b0.operand(Correlate.class)
+                        .inputs(
+                            b1 -> b1.operand(RelNode.class).anyInputs(),
+                            b2 -> b2.operand(Filter.class).anyInputs()))
+            .withDescription("CorrelateFilterTransposeRuleRight")
+            .as(CorrelateFilterTransposeRuleRight.Config.class);
+
+    @Override
+    default CorrelateFilterTransposeRuleRight toRule() {
+      return new CorrelateFilterTransposeRuleRight(this);
+    }
+  }
+}

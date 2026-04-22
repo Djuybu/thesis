@@ -1,0 +1,372 @@
+/*
+ * Copyright (C) 2017-2019 Dremio Corporation
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.dremio.exec.work.user;
+
+import static com.dremio.options.OptionValue.OptionType.QUERY;
+import static com.dremio.options.OptionValue.createBoolean;
+import static com.dremio.options.OptionValue.createLong;
+import static com.dremio.options.OptionValue.createString;
+
+import com.dremio.catalog.model.VersionContext;
+import com.dremio.exec.ExecConstants;
+import com.dremio.exec.planner.physical.PlannerSettings;
+import com.dremio.exec.planner.physical.PlannerSettings.StoreQueryResultsPolicy;
+import com.dremio.options.OptionManager;
+import com.google.common.base.Preconditions;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/** Configuration to modify local query execution. */
+public class LocalExecutionConfig implements OptionProvider {
+  private final boolean enableLeafLimits;
+  private final boolean enableOutputLimits;
+  private final boolean allowPartitionPruning;
+  private final boolean failIfNonEmptySent;
+  private final boolean ignoreColumnsLimits;
+  private final String username;
+  private final List<String> sqlContext;
+  private final boolean internalSingleThreaded;
+  private final String queryResultsStorePath;
+  private final boolean exposeInternalSources;
+  private final String engineName;
+  private final String sessionId;
+  private final Map<String, VersionContext> sourceVersionMapping;
+  private final StoreQueryResultsPolicy storeQueryResultsPolicy;
+  private final String reflectionMode;
+
+  LocalExecutionConfig(
+      final boolean enableLeafLimits,
+      final boolean enableOutputLimits,
+      final boolean failIfNonEmptySent,
+      final String username,
+      final List<String> sqlContext,
+      final boolean internalSingleThreaded,
+      final String queryResultsStorePath,
+      final boolean allowPartitionPruning,
+      final boolean exposeInternalSources,
+      final boolean ignoreColumnsLimits,
+      final String engineName,
+      final String sessionId,
+      final Map<String, VersionContext> sourceVersionMapping,
+      final StoreQueryResultsPolicy storeQueryResultsPolicy,
+      final String reflectionMode) {
+    this.enableLeafLimits = enableLeafLimits;
+    this.enableOutputLimits = enableOutputLimits;
+    this.failIfNonEmptySent = failIfNonEmptySent;
+    this.username = username;
+    this.sqlContext = sqlContext;
+    this.internalSingleThreaded = internalSingleThreaded;
+    this.queryResultsStorePath = Preconditions.checkNotNull(queryResultsStorePath);
+    this.ignoreColumnsLimits = ignoreColumnsLimits;
+    this.allowPartitionPruning = allowPartitionPruning;
+    this.exposeInternalSources = exposeInternalSources;
+    this.engineName = engineName;
+    this.sessionId = sessionId;
+    this.sourceVersionMapping = new HashMap<>(sourceVersionMapping);
+    this.storeQueryResultsPolicy = storeQueryResultsPolicy;
+    this.reflectionMode = reflectionMode;
+  }
+
+  public String getUsername() {
+    return username;
+  }
+
+  public boolean isExposingInternalSources() {
+    return exposeInternalSources;
+  }
+
+  public List<String> getSqlContext() {
+    return sqlContext;
+  }
+
+  public boolean isFailIfNonEmptySent() {
+    return failIfNonEmptySent;
+  }
+
+  public String getEngineName() {
+    return engineName;
+  }
+
+  public String getSessionId() {
+    return sessionId;
+  }
+
+  public Map<String, VersionContext> getSourceVersionMapping() {
+    return sourceVersionMapping;
+  }
+
+  @Override
+  public void applyOptions(OptionManager manager) {
+    if (enableLeafLimits) {
+      manager.setOption(
+          createBoolean(QUERY, PlannerSettings.ENABLE_LEAF_LIMITS.getOptionName(), true));
+      manager.setOption(
+          createLong(
+              QUERY,
+              ExecConstants.MAX_WIDTH_GLOBAL_KEY,
+              manager.getOption(PlannerSettings.LEAF_LIMIT_MAX_WIDTH)));
+      manager.setOption(createLong(QUERY, ExecConstants.SLICE_TARGET, 1));
+    }
+
+    if (enableOutputLimits) {
+      manager.setOption(
+          createBoolean(QUERY, PlannerSettings.ENABLE_OUTPUT_LIMITS.getOptionName(), true));
+    }
+
+    if (ignoreColumnsLimits) {
+      manager.setOption(
+          createBoolean(QUERY, PlannerSettings.IGNORE_SCANNED_COLUMNS_LIMIT.getOptionName(), true));
+    }
+
+    manager.setOption(
+        createString(
+            QUERY,
+            PlannerSettings.STORE_QUERY_RESULTS.getOptionName(),
+            storeQueryResultsPolicy.name()));
+    manager.setOption(
+        createString(
+            QUERY,
+            PlannerSettings.QUERY_RESULTS_STORE_TABLE.getOptionName(),
+            queryResultsStorePath));
+
+    if (!allowPartitionPruning) {
+      manager.setOption(
+          createBoolean(QUERY, PlannerSettings.ENABLE_PARTITION_PRUNING.getOptionName(), false));
+    }
+
+    if (internalSingleThreaded) {
+      manager.setOption(createBoolean(QUERY, ExecConstants.SORT_FILE_BLOCKS.getOptionName(), true));
+      manager.setOption(
+          createBoolean(QUERY, PlannerSettings.DISABLE_EXCHANGES.getOptionName(), true));
+    }
+    if (reflectionMode != null) {
+      manager.setOption(
+          createString(QUERY, PlannerSettings.REFRESH_MODE_STRING.getOptionName(), reflectionMode));
+    }
+  }
+
+  public static class Builder {
+    private boolean enableLeafLimits;
+    private boolean enableOutputLimits;
+    private long maxQueryWidth;
+    private boolean failIfNonEmptySent;
+    private String username;
+    private List<String> sqlContext;
+    private Map<String, VersionContext> sourceVersionMapping = new HashMap<>();
+    private boolean internalSingleThreaded;
+    private boolean ignoreColumnsLimits;
+    private String queryResultsStorePath;
+    private boolean allowPartitionPruning;
+    private boolean exposeInternalSources;
+    private String engineName;
+    private String sessionId;
+    private StoreQueryResultsPolicy storeQueryResultsPolicy =
+        StoreQueryResultsPolicy.PATH_AND_ATTEMPT_ID;
+    private String reflectionMode;
+
+    private Builder() {}
+
+    /**
+     * Sets the flag to limit the size of data that will be scanned.
+     *
+     * @param enableLeafLimits flag to enable leaf limits
+     * @return this builder
+     */
+    public Builder setEnableLeafLimits(boolean enableLeafLimits) {
+      this.enableLeafLimits = enableLeafLimits;
+      return this;
+    }
+
+    /**
+     * Sets the flag to limit the size of data that will be output.
+     *
+     * @param enableOutputLimits flag to enable leaf limits
+     * @return this builder
+     */
+    public Builder setEnableOutputLimits(boolean enableOutputLimits) {
+      this.enableOutputLimits = enableOutputLimits;
+      return this;
+    }
+
+    /**
+     * Sets the flag to fail the query rather than reattempt when some data has already been sent to
+     * client. This is applicable only when reattempt is possible.
+     *
+     * @param failIfNonEmptySent fail if non empty batch sent
+     * @return this builder
+     */
+    public Builder setFailIfNonEmptySent(boolean failIfNonEmptySent) {
+      this.failIfNonEmptySent = failIfNonEmptySent;
+      return this;
+    }
+
+    /**
+     * Sets the username for the query.
+     *
+     * @param username username
+     * @return this builder
+     */
+    public Builder setUsername(String username) {
+      this.username = username;
+      return this;
+    }
+
+    /**
+     * Sets the default schema to 'use' for the query.
+     *
+     * @param sqlContext sql context
+     * @return this builder
+     */
+    public Builder setSqlContext(List<String> sqlContext) {
+      this.sqlContext = sqlContext;
+      return this;
+    }
+
+    /**
+     * Sets the default schema to 'use' for the query.
+     *
+     * @param sourceVersionMapping reference the mapping of source to each reference in dataplane
+     * @return this builder
+     */
+    public Builder setSourceVersionMapping(Map<String, VersionContext> sourceVersionMapping) {
+      this.sourceVersionMapping = sourceVersionMapping;
+      return this;
+    }
+
+    /**
+     * Sets the flag to run the query as single threaded (used for internal queries).
+     *
+     * @param internalSingleThreaded single threaded
+     * @return this builder
+     */
+    public Builder setInternalSingleThreaded(boolean internalSingleThreaded) {
+      this.internalSingleThreaded = internalSingleThreaded;
+      return this;
+    }
+
+    /**
+     * Sets the table path where the query results will be stored.
+     *
+     * @param queryResultsStorePath query result store path
+     * @return this builder
+     */
+    public Builder setQueryResultsStorePath(String queryResultsStorePath) {
+      this.queryResultsStorePath = queryResultsStorePath;
+      return this;
+    }
+
+    /**
+     * Sets the flag to enable partition pruning.
+     *
+     * @param allowPartitionPruning allow partition pruning
+     * @return this builder
+     */
+    public Builder setAllowPartitionPruning(boolean allowPartitionPruning) {
+      this.allowPartitionPruning = allowPartitionPruning;
+      return this;
+    }
+
+    /**
+     * Sets the flag to expose internal schemas (used for internal queries).
+     *
+     * @param exposeInternalSources expose internal schemas
+     * @return this builder
+     */
+    public Builder setExposeInternalSources(boolean exposeInternalSources) {
+      this.exposeInternalSources = exposeInternalSources;
+      return this;
+    }
+
+    /**
+     * set engine name.
+     *
+     * @param engineName
+     * @return
+     */
+    public Builder setEngineName(String engineName) {
+      this.engineName = engineName;
+      return this;
+    }
+
+    /**
+     * set ignoreColumnsLimits.
+     *
+     * @param ignoreColumnsLimits
+     * @return
+     */
+    public Builder setIgnoreColumnsLimits(boolean ignoreColumnsLimits) {
+      this.ignoreColumnsLimits = ignoreColumnsLimits;
+      return this;
+    }
+
+    /**
+     * set session ID.
+     *
+     * @param sessionId
+     * @return
+     */
+    public Builder setSessionId(String sessionId) {
+      this.sessionId = sessionId;
+      return this;
+    }
+
+    /**
+     * set StoreQueryResultsPolicy
+     *
+     * @param policy
+     * @return
+     */
+    public Builder setStoreQueryResultsPolicy(StoreQueryResultsPolicy policy) {
+      this.storeQueryResultsPolicy = policy;
+      return this;
+    }
+
+    /**
+     * Sets the reflectionMode string
+     *
+     * @param reflectionMode
+     * @return this builder
+     */
+    public Builder setReflectionMode(String reflectionMode) {
+      this.reflectionMode = reflectionMode;
+      return this;
+    }
+
+    public LocalExecutionConfig build() {
+      return new LocalExecutionConfig(
+          enableLeafLimits,
+          enableOutputLimits,
+          failIfNonEmptySent,
+          username,
+          sqlContext,
+          internalSingleThreaded,
+          queryResultsStorePath,
+          allowPartitionPruning,
+          exposeInternalSources,
+          ignoreColumnsLimits,
+          engineName,
+          sessionId,
+          sourceVersionMapping,
+          storeQueryResultsPolicy,
+          reflectionMode);
+    }
+  }
+
+  public static Builder newBuilder() {
+    return new Builder();
+  }
+}

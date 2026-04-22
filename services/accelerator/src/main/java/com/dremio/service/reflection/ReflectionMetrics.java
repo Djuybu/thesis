@@ -17,7 +17,8 @@ package com.dremio.service.reflection;
 
 import com.dremio.exec.planner.common.PlannerMetrics;
 
-public class ReflectionMetrics {
+public final class ReflectionMetrics {
+  private ReflectionMetrics() {}
 
   // Shared prefix used by all reflection metrics
   private static String PREFIX = "reflections";

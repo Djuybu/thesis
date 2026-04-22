@@ -147,7 +147,7 @@ public class RefreshHandler implements SqlToPlanHandler {
   private RelNode relPlanForExplain;
 
   public RefreshHandler() {
-    this.writerOptionManager = WriterOptionManager.Instance;
+    this.writerOptionManager = WriterOptionManager.INSTANCE;
   }
 
   @Override

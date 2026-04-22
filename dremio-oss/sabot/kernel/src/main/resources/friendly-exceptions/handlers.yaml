@@ -1,0 +1,76 @@
+#
+# Copyright (C) 2017-2019 Dremio Corporation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+# Sample configuration section
+#- name:                                        -- Friendly handler name to help identify handlers for
+#                                                  debugging purposes (for example, this will appear in logs)
+#  match:                                       -- Section that dictates which exceptions this rule intercepts
+#    type: "gandiva"                            -- (Optional) Matches the exception type
+#                                                  (e.g. "gandiva" matches `GandivaException`)
+#
+#                                                  If both `pattern` and `patterns` are omitted, any message is a match
+#    pattern: "^out of memory$"                 -- (Optional) A single pattern to match the exception message against
+#    patterns:                                  -- (Optional) An list of patterns to match the exception message against
+#      - "^buffer expand failed in java"
+#      - "^Buffer overflow for output string"
+#      - "^Could not allocate memory"
+#  treatAs: "out-of-memory"                     -- The resulting flavor of the UserException wrapper:
+#                                                    - out-of-memory -> UserException.memoryError
+#                                                    - function      -> UserException.functionError
+#  friendlyMessage: "Query was cancelled because it exceeded the memory limits set by the administrator."
+#                                               -- (Optional) The friendly message to use in the UserException wrapper
+#                                                  If omitted, the original error message is propagated
+
+- name: "Gandiva memory exceptions"
+  match:
+    type: "gandiva"
+    patterns:
+      - "^buffer expand failed in java"
+      - "^Buffer overflow for output string"
+      - "^Could not allocate memory"
+  treatAs: "out-of-memory"
+  friendlyMessage: "Query was cancelled because it exceeded the memory limits set by the administrator."
+
+- name: "Non-user Gandiva exceptions"
+  match:
+    type: "gandiva"
+    patterns:
+      - "^Failed to make LLVM module"
+      - "^Unable to parse condition protobuf"
+      - "^could not finish evp cipher ctx for decryption"
+  treatAs: "function"
+  friendlyMessage: "There was a problem evaluating a native expression"
+
+- name: "User Gandiva exceptions"
+  match:
+    type: "gandiva"
+    patterns:
+      - "^divide by zero error"
+      - "^Index in split_part must be positive, value provided was"
+      - "^Index to extract out of range"
+      - "^Empty string cannot be converted to"
+      - "^unexpected byte .* encountered while decoding"
+      - "^Start position must be greater than 0"
+      - "^Error parsing value .* for given format."
+      - "^Failed to cast the string"
+      - "^Invalid character in time"
+      - "^Invalid millis for time value"
+      - "^Invalid timestamp or unknown zone for timestamp value"
+      - "^Not a valid date value"
+      - "^Not a valid day for timestamp value"
+      - "^Not a valid time for timestamp value"
+      - "^Failed to cast the string .* to .*"
+  treatAs: "function"

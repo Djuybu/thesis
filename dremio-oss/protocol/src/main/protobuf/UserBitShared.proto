@@ -1,0 +1,873 @@
+/*
+ * Copyright (C) 2017-2019 Dremio Corporation
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+syntax = "proto2";
+package exec.shared;
+
+option java_package = "com.dremio.exec.proto";
+option java_outer_classname = "UserBitShared";
+option optimize_for = SPEED;
+
+import "Types.proto";
+import "Coordination.proto";
+import "SchemaDef.proto";
+
+enum RpcChannel {
+  BIT_CONTROL = 0;
+  BIT_DATA = 1;
+  USER = 2;
+}
+
+enum QueryType {
+  SQL = 1;
+  LOGICAL = 2;
+  PHYSICAL = 3;
+  EXECUTION = 4;
+
+  /* Input is a prepared statement */
+  PREPARED_STATEMENT = 5;
+}
+
+message UserCredentials {
+  optional string user_name = 1;
+  optional string user_id = 2;
+}
+
+message QueryId {
+  optional sfixed64 part1 = 1;
+  optional sfixed64 part2 = 2;
+}
+
+message ExternalId {
+  optional sfixed64 part1 = 1;
+  optional sfixed64 part2 = 2;
+}
+
+message RpcEndpointInfos {
+    optional string name = 1;               // example: Dremio Server, Dremio C++ client
+    optional string version = 2;            // example: 1.9.0
+    optional uint32 major_version = 3;      // example: 1
+    optional uint32 minor_version = 4;      // example: 9
+    optional uint32 patch_version = 5;      // example: 0
+    optional string application = 6;        // example: Tableau 9.3
+    optional uint32 build_number = 7;       // example: 32
+    optional string version_qualifier = 8;  // example: SNAPSHOT
+}
+
+enum WorkloadClass {
+  REALTIME = 1; // Reserved for internal use.
+  NRT = 2; // for things like UI submission.
+  GENERAL = 3; // standard pool.
+  BACKGROUND = 4;
+  ADVANCED = 5;
+}
+
+/**
+ * To keep track of Workload Types
+ * needed in the context of resource scheduling
+ * WorkloadType provides more granularity then WorkloadClass
+ * in terms of resource allocation of a query
+ * while WorkloadClass provides very coarse division
+ */
+enum WorkloadType {
+  UNKNOWN = 1;
+  UI_PREVIEW = 2;
+  UI_RUN = 3;
+  JDBC = 4;
+  ODBC = 5;
+  REST = 6;
+  INTERNAL_PREVIEW = 7;
+  INTERNAL_RUN = 8;
+  ACCELERATOR = 9;
+  DDL = 10;
+  UI_DOWNLOAD = 11;
+  FLIGHT = 12;
+  METADATA_REFRESH = 13;
+  INTERNAL_ICEBERG = 14;
+  D2D = 15;
+}
+
+enum DremioExitCodes {
+  SUCCESS = 0;
+  GENERAL_FAILURE = 1;
+  OUT_OF_HEAP_FAILURE = 2;
+  LOST_MASTER_STATUS = 3;
+  SERVICE_START_FAILURE = 4;
+  FATAL_INTERNAL_ERROR = 5;
+  UNCAUGHT_EXCEPTION_HANDLER_EXIT = 6;
+  LOST_ZOOKEEPER_SESSION = 7;
+  UNSUPPORTED_DEPLOYMENT = 8;
+}
+
+message DremioPBError {
+  enum ErrorType {
+    /* equivalent to SQLClientInfoException
+     * - handshake version error
+     * - invalid schema
+     */
+    CONNECTION = 0;
+    /* equivalent to SQLRecoverableException
+     * - corrupt files: can't be read. FS read error
+     * - parsing error due to incomplete or incorrectly written records
+     */
+    DATA_READ = 1;
+    /* equivalent to SQLDataException
+     * - data type unsupported by format
+     */
+    DATA_WRITE = 2;
+    /* equivalent to SQLDataException
+     * - Casting errors
+     * - function not found for incoming types after implicit casting
+     * - Flatten misuse
+     */
+    FUNCTION = 3;
+    /* equivalent to SQLSyntaxErrorException
+     * - typos
+     * - missing table
+     * - SQL keyword misuse
+     * - function names/resolution
+     */
+    PARSE = 4;
+    /* equivalent to SQLInvalidAuthorizationSpecException
+     */
+    PERMISSION = 5;
+    /* equivalent to SQLNonTransientException
+     */
+    PLAN = 6;
+    /* equivalent to SQLRecoverableException or SQLTransientException
+     * - Recoverable: memory, disk
+     * - Transient: network
+     */
+    RESOURCE = 7;
+    /* equivalent to SQLNonTransientException.
+     */
+    SYSTEM = 8;
+    /* equivalent to SQLFeatureNotSupportedException
+     * - type change
+     * - schema change
+     */
+    UNSUPPORTED_OPERATION = 9;
+    /* SQL validation exception
+     * - invalid schema path
+     * - invalid entries in SQL tree
+     */
+    VALIDATION = 10;
+
+    /* Out of Memory exception
+     * This is mainly used for re-attempting the query
+     * This is a new error type not present in Apache Drill
+     */
+    OUT_OF_MEMORY = 1011;
+
+    /* Schema change exception
+     * This is mainly used for re-attempting the query
+     * This is a new error type not present in Apache Drill
+     */
+    SCHEMA_CHANGE = 1012;
+
+    /* I/O exception
+     *
+     * This is a new error type not present in Apache Drill
+     */
+    IO_EXCEPTION = 1013;
+
+    /* Concurrent modification exception
+     * Means: please refresh and retry the operation
+     * This is a new error type not present in Apache Drill
+     */
+    CONCURRENT_MODIFICATION = 1014;
+
+    /* Dataset metadata is invalid (or out of date).
+     *
+     * This is used to notify that metadata for a dataset is invalid or out of date. In which case,
+     * dataset refresh has to be triggered, and then the query could be potentially re-attempted.
+     *
+     * This is a new error type not present in Apache Drill
+     */
+    INVALID_DATASET_METADATA = 1015;
+
+    /*
+     * Internal reflection error
+     */
+    REFLECTION_ERROR = 1016;
+
+    /*
+     * Source in bad state
+     */
+    SOURCE_BAD_STATE = 1017;
+
+    /* JSON field change exception
+     * This is mainly used for re-attempting the query
+     * This is a new error type not present in Apache Drill
+     */
+    JSON_FIELD_CHANGE = 1018;
+
+    /* Resource timeout exception
+     * This is mainly used for re-attempting the query
+     * This is a new error type not present in Apache Drill
+     */
+    RESOURCE_TIMEOUT = 1019;
+
+    /* Retry attempt error exception
+     * This is mainly used for notifying that system failed in completing the operation even after retrying multiple times
+     * This is mainly used for re-attempting the operation
+     * This is a new error type not present in Apache Drill
+     */
+    RETRY_ATTEMPT_ERROR = 1020;
+
+    /* Internal refresh dataset error
+    */
+    REFRESH_DATASET_ERROR = 1021;
+
+    /*
+     * PDFS Retriable Error.
+     * The query should be reattempted, if this error is received.
+     * This is Deprecated and shouldn't be used.
+     */
+    PDFS_RETRIABLE_ERROR = 1022;
+  }
+
+  optional string error_id = 1; // for debug tracing purposes
+  optional NodeEndpoint endpoint = 2;
+  optional ErrorType error_type = 3;
+  optional string message = 4;
+  optional ExceptionWrapper exception = 5;
+  repeated ParsingError parsing_error = 6; //optional, used when providing location of error within a piece of text.
+
+  // these additional fields are not present in Apache Drill
+  optional string original_message = 1001;
+  repeated string context = 1002;
+  optional bytes typeSpecificContext = 1003;
+  optional string error_origin = 1004;
+}
+
+message ExceptionWrapper {
+  optional string exception_class = 1;
+  optional string message = 2;
+  repeated StackTraceElementWrapper stack_trace = 3;
+  optional ExceptionWrapper cause = 4;
+}
+
+message StackTraceElementWrapper {
+    optional string class_name = 1;
+    optional string file_name = 2;
+    optional int32 line_number = 3;
+    optional string method_name = 4;
+    optional bool is_native_method = 5;
+}
+
+
+message ParsingError{
+  optional int32 start_column = 2;
+  optional int32 start_row = 3;
+  optional int32 end_column = 4;
+  optional int32 end_row = 5;
+}
+
+message RecordBatchDef {
+  optional int32 record_count = 1;
+  repeated SerializedField field = 2;
+  optional bool carries_two_byte_selection_vector = 3;
+}
+
+message NamePart{
+
+  enum Type{
+    NAME = 0;
+    ARRAY = 1;
+  }
+
+  optional Type type = 1;
+  optional string name = 2;
+  optional NamePart child = 3;
+}
+
+message SerializedField {
+  optional common.MajorType major_type = 1; // the type associated with this field.
+  optional NamePart name_part = 2;
+  repeated SerializedField child = 3; // only in the cases of type == MAP or REPEAT_MAP or REPEATED_LIST
+
+  optional int32 value_count = 4;
+  optional int32 var_byte_length = 5;
+  optional int32 buffer_length = 7;
+}
+
+message NodeStatus {
+	optional int32 node_id = 1;
+	optional int64 memory_footprint = 2;
+}
+
+/*
+ * Used by the server to report informations about the query state to the client
+ */
+message QueryResult {
+	enum QueryState {
+	  STARTING = 0; // query has been scheduled for execution. This is post-enqueued.
+	  RUNNING = 1;
+	  COMPLETED = 2; // query has completed successfully
+	  CANCELED = 3; // query has been cancelled, and all cleanup is complete
+	  FAILED = 4;
+	  NO_LONGER_USED_1 = 5; // formerly meant cancellation requested, no longer used.
+	  ENQUEUED = 6; // query has been enqueued. this is pre-starting.
+	}
+
+	optional QueryState query_state = 1;
+	optional QueryId query_id = 2;
+	repeated DremioPBError error = 3;
+}
+
+/*
+ * Used by the server when sending query result data batches to the client
+ */
+message QueryData {
+  optional QueryId query_id = 1;
+  optional int32 row_count = 2;
+  optional RecordBatchDef def = 3;
+}
+
+message QueryInfo {
+  optional string query = 1;
+  optional int64 start = 2;
+  optional QueryResult.QueryState state = 3;
+  optional string user = 4 [default = "-"];
+  optional NodeEndpoint foreman = 5;
+}
+
+message QueryProfile {
+  optional QueryId id = 1;
+  optional QueryType type = 2;
+  optional int64 start = 3;
+  optional int64 end = 4;
+  optional string query = 5;
+  optional string plan = 6;
+  optional NodeEndpoint foreman = 7;
+  optional QueryResult.QueryState state = 8;
+  optional int32 total_fragments = 9;
+  optional int32 finished_fragments = 10;
+  repeated MajorFragmentProfile fragment_profile = 11;
+  optional string user = 12 [default = "-"];
+  optional string error = 13;
+  optional string verbose_error = 14;
+  optional string error_id = 15;
+  optional string error_node = 16;
+  optional int64 planning_start = 17;
+  optional int64 planning_end = 18;
+  optional string json_plan = 19;
+  optional QueryId prepare_id = 24;
+  optional RpcEndpointInfos client_info = 25;
+  repeated PlanPhaseProfile plan_phases = 26;
+  optional AccelerationProfile acceleration_profile = 27;
+  optional string full_schema = 28;
+  optional string non_default_options_JSON = 29; // non-default (option, value) tuplets in json format
+  repeated DatasetProfile dataset_profile = 30;
+  repeated NodeQueryProfile node_profile = 31;
+  optional string dremio_version = 32;
+  optional CoreOperatorTypeMetricsMap operator_type_metrics_map = 33;
+  optional ResourceSchedulingProfile resource_scheduling_profile = 34;
+  optional string cancel_reason = 35;
+  optional int64 command_pool_wait_millis = 36;
+  optional bytes serialized_plan = 37 [deprecated = true];
+  repeated AttemptEvent state_list = 38;
+  optional int32 num_plan_cache_used = 39;
+  map<string, RelNodeInfo> rel_info_map = 40;
+  optional int32 num_joins_in_user_query = 41;
+  optional int32 num_joins_in_final_prel = 42;
+  optional ContextInfo context_info = 43;
+  optional int64 cancel_start_time = 44;
+  optional ResultsCacheProfile results_cache_profile = 45;
+  optional CancelType cancel_type = 46;
+}
+
+enum CancelType {
+    CANCEL_USER_INITIATED = 0;
+    CANCEL_CONNECTION_CLOSED = 1;
+    CANCEL_EXECUTION_RUNTIME_EXCEEDED = 2;
+    CANCEL_RESOURCE_UNAVAILABLE = 3;
+    CANCEL_UNCLASSIFIED = 4;
+    CANCEL_HEAP_MONITOR = 5;
+    CANCEL_DIRECT_MEMORY_EXCEEDED = 6;
+    COORDINATOR_CANCEL_HEAP_MONITOR = 7;
+    COORDINATOR_CANCEL_DIRECT_MEMORY_EXCEEDED = 8;
+    EXECUTOR_CANCEL_HEAP_MONITOR = 9;
+    EXECUTOR_CANCEL_DIRECT_MEMORY_EXCEEDED = 10;
+}
+
+message SourceVersionSetting {
+  enum Usage {
+   USED_BY_QUERY = 0;
+   NOT_USED_BY_QUERY =1;
+  }
+  optional string source = 1;
+  optional string versionContext = 2;
+  optional Usage usage = 3;
+}
+
+message ContextInfo {
+ optional string schema_path_context = 1;
+ repeated SourceVersionSetting sourceVersionSetting = 2;
+}
+
+message RelNodeInfo{
+  oneof info {
+     FilterInfo filter_info = 1;
+     JoinInfo join_info = 2;
+     ScanInfo scan_info = 3;
+     AggregateInfo aggregate_info = 4;
+  }
+}
+
+message AggExpressionInfo {
+  optional string aggregation = 1;
+  repeated string args = 2;
+}
+
+message AggregateInfo{
+  repeated string grouping_key = 1;
+  repeated AggExpressionInfo agg_expr = 2;
+}
+
+
+
+message FilterInfo{
+  optional string filter_string = 1;
+}
+
+message JoinInfo{
+  optional string join_filter_string = 1;
+  optional string extra_join_filter_string=2;
+}
+
+message ScanInfo{
+  optional string tableName = 1;
+}
+
+message AttemptEvent {
+	enum State {
+    INVALID_STATE = 0;
+    PENDING = 1;
+    METADATA_RETRIEVAL = 2;
+    PLANNING = 3;
+    QUEUED = 4;
+    ENGINE_START = 5;
+    EXECUTION_PLANNING = 6;
+    STARTING = 7;
+    RUNNING = 8;
+    COMPLETED = 9;
+    CANCELED = 10;
+    FAILED = 11;
+  }
+  optional State state = 1;
+  optional int64 start_time = 2;
+}
+
+message ResourceSchedulingProfile {
+  optional string queue_name = 1;
+  optional string queue_id = 2;
+  optional string rule_content = 3;
+  optional string rule_id = 4;
+  optional string rule_name = 5;
+  optional string rule_action = 6;
+  optional ResourceSchedulingProperties scheduling_properties = 7;
+  optional int64 resource_scheduling_start = 8;    // time, in ms, when resource scheduling started
+  optional int64 resource_scheduling_end = 9;      // time, in ms, when resource scheduling completed
+  optional string engine_name = 10; // engine used to run query in DCS
+}
+
+message ResourceSchedulingProperties {
+  optional double query_cost = 1;
+  optional string client_type = 2;
+  optional string query_type = 3;
+  optional string tag = 4;
+  optional string query_label = 5;
+}
+
+message AccelerationProfile {
+  optional bool accelerated = 1;
+  optional int32 num_substitutions = 2;
+  optional int64 millis_taken_getting_materializations = 3;
+  optional int64 millis_taken_normalizing = 4;
+  optional int64 millis_taken_substituting = 5;
+  repeated LayoutMaterializedViewProfile layout_profiles = 7;
+  repeated string normalized_query_plans = 8;
+  optional bytes acceleration_details = 9;
+}
+
+message ResultsCacheProfile {
+  required int64 cache_age = 1;
+  required int64 cache_file_size = 2;
+}
+
+enum DatasetType {
+  PDS = 1;
+  VDS = 2;
+}
+
+message DatasetProfile {
+  optional string dataset_path = 1;
+  optional DatasetType type = 2 [default = PDS];
+  optional bytes batch_schema = 3;
+  optional string sql = 4;
+  optional bool allow_approx_stats = 5;
+  optional string versionContext = 6;
+}
+
+enum ReflectionType {
+  RAW = 1;
+  AGG = 2;
+  EXTERNAL = 3;
+}
+
+message MeasureColumn {
+  optional string name = 1;
+  repeated string measure_type = 2;
+}
+
+message LayoutMaterializedViewProfile {
+  optional string layout_id = 1;
+  optional string materialization_id = 2;
+  optional int64 materialization_expiration_timestamp = 3;
+  optional string plan = 5;
+  repeated string dimensions = 6;
+  repeated string measures = 7 [deprecated = true];
+  repeated string sorted_columns = 8;
+  repeated string partitioned_columns = 9;
+  repeated string distribution_columns = 10;
+  repeated string display_columns = 11;
+  optional int32 num_used = 12;
+  optional int32 num_substitutions = 13;
+  // optional int64 millis_taken_normalizing = 14;  Not used anymore.
+  optional int64 millis_taken_substituting = 15;
+  repeated SubstitutionProfile substitutions = 16;
+  repeated string normalized_plans = 17;
+  repeated string normalized_query_plans = 18 [deprecated = true];
+  optional string name = 19;
+  optional string optimized_plan = 20;
+  optional ReflectionType type = 21;
+  optional bool snowflake = 22;
+  repeated MeasureColumn measure_columns = 23;
+  optional bool default_reflection = 24;
+  optional bool is_dremio_managed = 25 [deprecated = true];
+  optional bool is_stale = 26;
+  optional string reflection_mode = 27;
+}
+
+message SubstitutionProfile {
+  optional string plan = 1;
+}
+
+message PlanPhaseProfile {
+  optional string phase_name = 1;
+  optional int64 duration_millis = 2;
+  optional string plan = 3;
+  optional string planner_dump = 4;
+  optional FragmentRpcSizeStats size_stats = 5;
+  map<string, int64> time_breakdown_per_rule = 6 [deprecated = true];
+  repeated PlannerPhaseRulesStats rules_breakdown_stats = 7;
+}
+
+message PlannerPhaseRulesStats {
+  optional string rule = 1;
+  optional int64 total_time_ms = 2;
+  optional int32 matched_count = 3;
+  optional int32 transformed_count = 4;
+  optional int64 relnodes_count = 5;
+}
+
+message MajorFragmentProfile {
+  optional int32 major_fragment_id = 1;
+  repeated MinorFragmentProfile minor_fragment_profile = 2;
+  repeated NodePhaseProfile node_phase_profile = 3;
+  optional int32 phase_weight = 4;
+}
+
+enum SharedResourceCategory {
+  UPSTREAM = 0;
+  DOWNSTREAM = 1;
+  OTHER = 2;
+  MEMORY = 3;
+}
+
+message BlockedResourceDuration {
+  optional string resource = 1;
+  optional SharedResourceCategory category = 2;
+  optional int64 duration = 3;
+}
+
+message MinorFragmentProfile {
+  optional FragmentState state = 1;
+  optional DremioPBError error = 2;
+  optional int32 minor_fragment_id = 3;
+  repeated OperatorProfile operator_profile = 4;
+  optional int64 start_time = 5;
+  optional int64 end_time = 6;
+  optional int64 memory_used = 7;
+  optional int64 max_memory_used = 8;
+  optional NodeEndpoint endpoint = 9;
+  optional int64 last_update = 10;
+  optional int64 last_progress = 11;
+  // max memory used for incoming buffers (not handed off to receiver operator yet)
+  optional int64 max_incoming_memory_used = 12;
+
+// if you make any changes to the fragment stats make sure to update the profile rendering code in FragmentWrapper
+  optional int64 sleeping_duration = 1001;
+  optional int64 blocked_duration = 1002;
+  optional int64 first_run = 1003;
+  optional int64 run_duration = 1004;
+  optional int64 num_runs = 1005;
+  optional int64 setup_duration = 1006;
+  optional int64 finish_duration = 1007;
+  optional int64 blocked_on_upstream_duration = 1008;
+  optional int64 blocked_on_downstream_duration = 1009;
+  optional int64 blocked_on_shared_resource_duration = 1010;
+  repeated BlockedResourceDuration per_resource_blocked_duration = 1011;
+  optional int64 blocked_on_memory_duration = 1012;
+  optional int64 run_q_load = 1013;
+  optional int64 num_slices = 1014;
+  optional int64 num_long_slices = 1015;
+  optional int64 num_short_slices = 1016;
+  optional int64 recent_slice_start_time = 1017;
+  optional int64 cancel_start_time = 1018;
+}
+
+// Information about expression splits (in project/filter)
+message ExpressionSplitInfo {
+  optional string named_expression = 1;
+  optional bool in_gandiva = 2;
+  optional string output_name = 3;
+  repeated string depends_on = 4;
+  optional bool optimize = 5;
+}
+
+message SlowIOInfo {
+  optional string file_path = 1;
+  optional int64 io_time = 2;
+  optional int64 io_size = 3;
+  optional int64 io_offset = 4;
+}
+
+message RunTimeFilterDetailsInfo {
+  optional string probe_target = 1;
+  optional bool is_partitioned_coulmn = 2;
+  optional bool is_non_partitioned_column = 3;
+  repeated string probe_field_names = 4;
+  optional int64  number_of_values = 5;
+  optional int32  number_of_hash_functions =6;
+}
+
+message RunTimeFilterDetailsInfoInScan {
+  optional int32 minor_fragment_id = 1;
+  optional string join_source = 2;
+  optional bool is_partitioned_column = 3;
+  repeated string probe_field_names = 4;
+  optional int64 number_of_values = 5;
+  optional int32 number_of_hash_functions = 6;
+  optional int64 output_records_before_pruning = 7;
+  optional bool is_dropped = 8;
+}
+
+message ParquetDecodingDetailsInfo {
+  optional string encoding = 1;
+  optional string parquet_type = 2;
+  optional string arrow_type = 3;
+  optional string decoding_function = 4;
+  optional int64 decoded_number_of_values = 5;
+  optional int64 decoding_time_nanos = 6;
+}
+
+// Non-metric Operator level details that show up in the profile
+message OperatorProfileDetails {
+  repeated ExpressionSplitInfo split_infos = 1;
+  repeated SlowIOInfo slow_io_infos = 2;
+  repeated SlowIOInfo slow_metadata_io_infos = 3;
+  repeated RunTimeFilterDetailsInfo runtimefilter_details_infos = 4;
+  repeated RunTimeFilterDetailsInfoInScan runtimefilter_details_infos_in_scan = 5;
+  repeated ParquetDecodingDetailsInfo parquet_decoding_details_info = 6;
+}
+
+message OperatorProfile {
+  repeated StreamProfile input_profile = 1;
+  optional int32 operator_id = 3;
+  optional int32 operator_type = 4;
+  optional int64 setup_nanos = 5;
+  optional int64 process_nanos = 6;
+  optional int64 peak_local_memory_allocated = 7;
+  repeated MetricValue metric = 8;
+  optional int64 wait_nanos = 9;
+  optional OperatorProfileDetails details = 10;
+  optional int32 operator_subtype = 11;
+  optional int64 outputRecords = 12;
+  optional int64 outputBytes = 13;
+  optional int64 addedFiles = 14; // DML
+  optional int64 removedFiles = 15; // DML
+  optional int32 operatorState = 16;
+  optional int64 lastScheduleTime = 17;
+}
+
+message StreamProfile {
+  optional int64 records = 1;
+  optional int64 batches = 2;
+  optional int64 schemas = 3;
+  optional int64 size = 4; // in bytes
+}
+
+message NodePhaseProfile {
+  optional NodeEndpoint endpoint = 1;
+  optional int64 max_memory_used = 2;
+}
+
+message NodeQueryProfile {
+  optional NodeEndpoint endpoint = 1;
+  optional int64 max_memory_used = 2;
+  optional int64 time_enqueued_before_submit_ms = 3;  // Time spent enqueued after query arrived at executor, and before
+                                                      // being submitted for execution. Measured in milliseconds
+  optional int32 number_of_cores = 4 [default = 0];
+}
+
+message MetricValue {
+  optional int32 metric_id = 1;
+  optional int64 long_value = 2;
+  optional double double_value = 3;
+}
+
+enum FragmentState {
+  SENDING = 0;
+  AWAITING_ALLOCATION = 1;
+  RUNNING = 2;
+  FINISHED = 3;
+  CANCELLED = 4;
+  FAILED = 5;
+  CANCELLATION_REQUESTED = 6;
+}
+
+enum CoreOperatorType {
+  SINGLE_SENDER = 0;
+  BROADCAST_SENDER = 1;
+  FILTER = 2;
+  HASH_AGGREGATE = 3;
+  HASH_JOIN = 4;
+  MERGE_JOIN = 5;
+  HASH_PARTITION_SENDER = 6;
+  LIMIT = 7;
+  MERGING_RECEIVER = 8;
+  ORDERED_PARTITION_SENDER = 9;
+  PROJECT = 10;
+  UNORDERED_RECEIVER = 11;
+  RANGE_SENDER = 12;
+  SCREEN = 13;
+  SELECTION_VECTOR_REMOVER = 14;
+  STREAMING_AGGREGATE = 15;
+  TOP_N_SORT = 16;
+  EXTERNAL_SORT = 17;
+  TRACE = 18;
+  UNION = 19;
+  OLD_SORT = 20;
+  PARQUET_ROW_GROUP_SCAN = 21;
+  HIVE_SUB_SCAN = 22;
+  SYSTEM_TABLE_SCAN = 23;
+  MOCK_SUB_SCAN = 24;
+  PARQUET_WRITER = 25;
+  DIRECT_SUB_SCAN = 26;
+  TEXT_WRITER = 27;
+  TEXT_SUB_SCAN = 28;
+  JSON_SUB_SCAN = 29;
+  INFO_SCHEMA_SUB_SCAN = 30;
+  COMPLEX_TO_JSON = 31;
+  PRODUCER_CONSUMER = 32;
+  HBASE_SUB_SCAN = 33;
+  WINDOW = 34;
+  NESTED_LOOP_JOIN = 35;
+  AVRO_SUB_SCAN = 36;
+  MONGO_SUB_SCAN = 37;
+  ELASTICSEARCH_SUB_SCAN = 38;
+  ELASTICSEARCH_AGGREGATOR_SUB_SCAN = 39;
+  FLATTEN = 40;
+  EXCEL_SUB_SCAN = 41;
+  ARROW_SUB_SCAN = 42;
+  ARROW_WRITER = 43;
+  JSON_WRITER = 44;
+  VALUES_READER = 45;
+  CONVERT_FROM_JSON = 46;
+  JDBC_SUB_SCAN = 47;
+  DICTIONARY_LOOKUP = 48;
+  WRITER_COMMITTER = 49;
+  ROUND_ROBIN_SENDER = 50;
+  BOOST_PARQUET = 51;
+  ICEBERG_SUB_SCAN = 52;
+  TABLE_FUNCTION = 53;
+  DELTALAKE_SUB_SCAN = 54;
+  DIR_LISTING_SUB_SCAN = 55;
+  ICEBERG_WRITER_COMMITTER = 56;
+  GRPC_WRITER = 57;
+  MANIFEST_WRITER = 58;
+  FLIGHT_SUB_SCAN = 59;
+  BRIDGE_FILE_WRITER_SENDER = 60;
+  BRIDGE_FILE_READER_RECEIVER = 61;
+  BRIDGE_FILE_READER = 62;
+  ICEBERG_MANIFEST_WRITER = 63;
+  ICEBERG_METADATA_FUNCTIONS_READER = 64;
+  ICEBERG_SNAPSHOTS_SUB_SCAN = 65;
+  NESSIE_COMMITS_SUB_SCAN = 66;
+  SMALL_FILE_COMBINATION_WRITER = 67;
+  ARROW_WRITER_AUXILIARY = 68;
+}
+
+message MetricDef {
+  enum DisplayType {
+    DISPLAY_NEVER = 0;
+    DISPLAY_BY_DEFAULT = 1;
+    DISPLAY_ON_MORE = 2;
+  };
+  enum AggregationType {
+    SUM = 0;
+    MAX = 1;
+  };
+  optional int32 id = 1;
+  optional string name = 2;
+  optional int32 rank = 3 [deprecated = true];
+  optional string user_friendly_name = 4 [deprecated = true];
+  optional DisplayType display_type = 5 [default = DISPLAY_NEVER];
+  optional AggregationType aggregation_type = 6 [default = SUM];
+  optional string display_code = 7 [default = ""];
+}
+
+message MetricsDef {
+  // underlying data structure is list of metric defination with index as metric id and value MetricDef
+  repeated MetricDef metric_def = 1;
+}
+
+// Since current version of protobuf that we use does not support usage of map, using listOfList<MetricDef> as map<operatorId, map<metricid, metricDef>>
+message CoreOperatorTypeMetricsMap {
+  // underlying data structure is list with index as operator type and value as MetricsDef
+  repeated MetricsDef metrics_def = 1;
+}
+
+// Stats about the rpc size when sending fragments to executor nodes.
+message FragmentRpcSizeStats {
+  optional int32 size_per_node = 1;
+  repeated FragmentRpcSizeByMajor fragments = 2;
+  repeated FragmentRpcSizeByAttr minor_specific_attrs = 3;
+  repeated FragmentRpcSizeByAttr shared_attrs = 4;
+}
+
+message FragmentRpcSizeByMajor {
+  optional int32 major_id = 1;
+  optional int32 major_portion_size = 2;
+  optional int32 minor_portion_size = 3;
+}
+
+message FragmentRpcSizeByAttr {
+  optional string name = 1;
+  optional int32 size = 2;
+}

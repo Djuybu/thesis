@@ -34,7 +34,7 @@ public class TestWriterOptionManager {
     List<ReflectionField> fields = Arrays.asList(new ReflectionField().setName("my_name"));
     Map<String, String> knownFields = ImmutableMap.of("my_name", "my_name");
 
-    WriterOptionManager subject = WriterOptionManager.Instance;
+    WriterOptionManager subject = WriterOptionManager.INSTANCE;
 
     List<String> actual =
         subject.validateAndPluckNames(
@@ -48,7 +48,7 @@ public class TestWriterOptionManager {
     List<ReflectionField> fields = Arrays.asList(new ReflectionField().setName("Unknown Field"));
     Map<String, String> knownFields = ImmutableMap.of("my field", "my field");
 
-    WriterOptionManager subject = WriterOptionManager.Instance;
+    WriterOptionManager subject = WriterOptionManager.INSTANCE;
 
     try {
       subject.validateAndPluckNames(

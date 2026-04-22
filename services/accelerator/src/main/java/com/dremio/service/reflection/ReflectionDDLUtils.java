@@ -34,7 +34,9 @@ import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.dialect.CalciteSqlDialect;
 import org.apache.calcite.sql.parser.SqlParserPos;
 
-public class ReflectionDDLUtils {
+public final class ReflectionDDLUtils {
+  private ReflectionDDLUtils() {}
+
   private static final org.slf4j.Logger logger =
       org.slf4j.LoggerFactory.getLogger(ReflectionDDLUtils.class);
 

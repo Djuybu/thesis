@@ -1,0 +1,338 @@
+{
+  "sourceType": "NESSIE",
+  "tags": [],
+  "metadataRefresh": {
+    "isFileSystemSource": true
+  },
+  "form": {
+    "tabs": [
+      {
+        "name": "General",
+        "isGeneral": true,
+        "sections": [
+          {
+            "elements" : [
+              {
+                "propName": "config.nessieEndpoint",
+                "errMsg": "Required"
+              },
+              {
+                "propName": "config.nessieAuthType",
+                "uiType": "container_selection",
+                "defaultValue": "BEARER",
+                "options": [
+                  {
+                    "value": "NONE",
+                    "container": {
+                      "help": {
+                        "position": "top",
+                        "text": "No authentication is enforced on Nessie server."
+                      }
+                    }
+                  },
+                  {
+                    "value": "BEARER",
+                    "container": {
+                      "elements": [
+                        {
+                          "propName": "config.nessieAccessToken",
+                          "size": "full",
+                          "secure": true
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "value": "OAUTH2",
+                    "container": {
+                      "elements": [
+                        {
+                          "propName": "config.oauth2TokenEndpointURI",
+                          "size": "full",
+                          "errMsg": "Client ID , secret and OAuth2 URI are required for OAuth2  authentication.",
+                          "tooltip": "Token endpoint of the OAuth2 Authorization Server."
+                        },
+                        {
+                          "propName": "config.oauth2ClientId",
+                          "size": "full",
+                          "errMsg": "Client ID , secret and OAuth2 URI are required for OAuth2  authentication."
+                        },
+                        {
+                          "propName": "config.oauth2ClientSecret",
+                          "size": "full",
+                          "secure": true,
+                          "errMsg": "Client ID , secret and OAuth2 URI are required for OAuth2 authentication."
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Storage",
+        "sections": [
+          {
+            "elements": [
+              {
+                "propName": "config.storageProvider",
+                "uiType": "container_selection",
+                "options": [
+                  {
+                    "value": "AWS",
+                    "container": {
+                      "sections": [
+                        {
+                          "name": "S3 Storage",
+                          "elements": [
+                            {
+                              "propName": "config.awsRootPath",
+                              "placeholder": "bucket-name/optional/path/to/folder",
+                              "prefix": "s3://",
+                              "tooltip": "The default write location for iceberg metadata and data."
+                            }
+                          ]
+                        },
+                        {
+                          "name": "S3 Authentication",
+                          "elements": [
+                            {
+                              "propName": "config.credentialType",
+                              "uiType": "container_selection",
+                              "options": [
+                                {
+                                  "value": "ACCESS_KEY",
+                                  "container": {
+                                    "elements": [
+                                      {
+                                        "propName": "config.awsAccessKey",
+                                        "size": "full",
+                                        "errMsg": "Both access secret and key are required for Access Key type authentication."
+                                      },
+                                      {
+                                        "propName": "config.awsAccessSecret",
+                                        "size": "full",
+                                        "errMsg": "Both access secret and key are required for Access Key type authentication.",
+                                        "secure": true
+                                      },
+                                      {
+                                        "propName": "config.assumedRoleARN",
+                                        "size": "full",
+                                        "validate": {
+                                          "isRequired": false
+                                        }
+                                      }
+                                    ]
+                                  }
+                                },
+                                {
+                                  "value": "EC2_METADATA",
+                                  "container": {
+                                    "elements": [
+                                      {
+                                        "propName": "config.assumedRoleARN",
+                                        "size": "full",
+                                        "validate": {
+                                          "isRequired": false
+                                        }
+                                      }
+                                    ]
+                                  }
+                                },
+                                {
+                                  "value": "AWS_PROFILE",
+                                  "container": {
+                                    "elements": [
+                                      {
+                                        "propName": "config.awsProfile",
+                                        "label": "AWS Profile (optional)",
+                                        "placeholder": "default",
+                                        "size": "full",
+                                        "validate": {
+                                          "isRequired": false
+                                        }
+                                      }
+                                    ]
+                                  }
+                                },
+                                {
+                                  "value": "NONE",
+                                  "container": {
+                                  }
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "value": "AZURE",
+                    "container": {
+                      "sections": [
+                        {
+                          "name": "Azure Storage",
+                          "elements": [
+                            {
+                              "propName": "config.azureStorageAccount"
+                            },
+                            {
+                              "propName": "config.azureRootPath",
+                              "placeholder": "containername/optional/path/to/folder",
+                              "tooltip": "The default write location for iceberg metadata and data."
+                            }
+                          ]
+                        },
+                        {
+                          "name": "Azure Authentication",
+                          "elements": [
+                            {
+                              "propName": "config.azureAuthenticationType",
+                              "uiType": "container_selection",
+                              "options": [
+                                {
+                                  "value": "ACCESS_KEY",
+                                  "container": {
+                                    "elements": [
+                                      {
+                                        "propName": "config.azureAccessKey",
+                                        "secure": true,
+                                        "size": "full"
+                                      }
+                                    ]
+                                  }
+                                },
+                                {
+                                  "value": "AZURE_ACTIVE_DIRECTORY",
+                                  "container": {
+                                    "elements": [
+                                      {
+                                        "propName": "config.azureApplicationId",
+                                        "size": "full"
+                                      },
+                                      {
+                                        "propName": "config.azureClientSecret",
+                                        "secure": true,
+                                        "size": "full"
+                                      },
+                                      {
+                                        "propName": "config.azureOAuthTokenEndpoint",
+                                        "size": "full"
+                                      }
+                                    ]
+                                  }
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "value": "GOOGLE",
+                    "container": {
+                      "sections": [
+                        {
+                          "name": "GCS Storage",
+                          "elements": [
+                            {
+                              "propName": "config.googleProjectId"
+                            },
+                            {
+                              "propName": "config.googleRootPath",
+                              "placeholder": "bucket-name/optional/path/to/folder",
+                              "prefix": "gs://",
+                              "tooltip": "The default write location for iceberg metadata and data."
+                            }
+                          ]
+                        },
+                        {
+                          "name": "GCS Authentication",
+                          "elements": [
+                            {
+                              "propName": "config.googleAuthenticationType",
+                              "uiType": "container_selection",
+                              "options": [
+                                {
+                                  "value": "SERVICE_ACCOUNT_KEYS",
+                                  "container": {
+                                    "elements": [
+                                      {
+                                        "propName": "config.googleClientEmail"
+                                      },
+                                      {
+                                        "propName": "config.googleClientId"
+                                      },
+                                      {
+                                        "propName": "config.googlePrivateKeyId"
+                                      },
+                                      {
+                                        "propName": "config.googlePrivateKey",
+                                        "secure": true
+                                      }
+                                    ]
+                                  }
+                                },
+                                {
+                                  "value": "AUTO",
+                                  "container": {}
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "Other",
+            "elements": [
+              {
+                "propName": "config.propertyList",
+                "emptyLabel": "No properties added",
+                "addLabel": "Add property"
+              },
+              {
+                "propName": "config.secure"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Advanced Options",
+        "sections": [
+          {
+            "name": "General",
+            "elements": [
+              {
+                "propName": "config.asyncEnabled"
+              }
+            ]
+          },
+          {
+            "name": "Cache Options",
+            "checkboxController": "asyncEnabled",
+            "elements": [
+              {
+                "propName": "config.isCachingEnabled"
+              },
+              {
+                "propName": "config.maxCacheSpacePct"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

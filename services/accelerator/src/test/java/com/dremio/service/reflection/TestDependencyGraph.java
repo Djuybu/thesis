@@ -154,9 +154,9 @@ public class TestDependencyGraph {
 
   @Test
   public void testLoadFromStore() throws Exception {
-    final DependenciesStore dependenciesStore = Mockito.mock(DependenciesStore.class);
+    final DependenciesStore mockDependenciesStore = Mockito.mock(DependenciesStore.class);
 
-    final DependencyGraph graph = new DependencyGraph(dependenciesStore);
+    final DependencyGraph graph = new DependencyGraph(mockDependenciesStore);
 
     // let's add some dependencies to the store
     // Map<Dependant, List<Parent>>
@@ -440,8 +440,8 @@ public class TestDependencyGraph {
 
   @Test
   public void testReflectionLineage() {
-    DependenciesStore dependenciesStore = Mockito.mock(DependenciesStore.class);
-    DependencyGraph graph = new DependencyGraph(dependenciesStore);
+    DependenciesStore mockDependenciesStore = Mockito.mock(DependenciesStore.class);
+    DependencyGraph graph = new DependencyGraph(mockDependenciesStore);
 
     // let's add some dependencies to the store
     // Map<Dependant, List<Parent>>

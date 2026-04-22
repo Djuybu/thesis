@@ -62,7 +62,7 @@ export class AccelerationBasic extends Component {
       const dims = data.dimensions || [];
       const meas = data.measures || [];
 
-      const rawDisplayFields = [...dims, ...meas.map(m => m.name)]
+      const rawDisplayFields = [...dims, ...meas.map((m) => m.name)]
         .filter((d) => !d.includes("$"))
         .map((d) => ({ name: d }));
 
@@ -78,7 +78,10 @@ export class AccelerationBasic extends Component {
             .map((d) => ({ name: d }));
           const measureFields = meas
             .filter((d) => !d.name.includes("$"))
-            .map((d) => ({ name: d.name, measureTypeList: d.aggregations || ["SUM", "COUNT"] }));
+            .map((d) => ({
+              name: d.name,
+              measureTypeList: d.aggregations || ["SUM", "COUNT"],
+            }));
 
           if (aggReflection) {
             const hasAgg =
@@ -99,7 +102,10 @@ export class AccelerationBasic extends Component {
                 fields.columnsDimensions.addField({ column: f.name }),
               );
               measureFields.forEach((f) =>
-                fields.columnsMeasures.addField({ column: f.name, measureTypeList: f.measureTypeList }),
+                fields.columnsMeasures.addField({
+                  column: f.name,
+                  measureTypeList: f.measureTypeList,
+                }),
               );
             }
           }

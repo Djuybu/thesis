@@ -1,0 +1,111 @@
+/*
+ * Copyright (C) 2017-2019 Dremio Corporation
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+syntax = "proto2";
+package exec.bit;
+
+option java_package = "com.dremio.exec.proto";
+option java_outer_classname = "ExecProtos";
+option optimize_for = SPEED;
+option java_generate_equals_and_hash = true;
+
+import "UserBitShared.proto";
+
+message FragmentHandle {
+	optional exec.shared.QueryId query_id = 1;
+	optional int32 major_fragment_id = 2;
+	optional int32 minor_fragment_id = 3;
+	optional exec.shared.QueryId parent_query_id = 4 [deprecated=true];
+}
+
+/*
+ * Prepared statement state on server side. Clients do not
+ * need to know the contents. They just need to submit it back to
+ * server when executing the prepared statement.
+ */
+message ServerPreparedStatementState {
+  optional string sql_query = 1;
+  optional int64 handle = 2;
+  optional exec.shared.QueryId prepare_id = 3;
+}
+
+message HashAggSpill {
+  optional int64 memory_use = 1;
+}
+
+message HashJoinSpill {
+  optional int64 memory_use = 1;
+  optional string message_type = 2;
+}
+
+message ExtSortSpillNotificationMessage {
+  optional int64 memory_use = 1;
+}
+
+/**
+ * Describes the type of filter sent as part of runtime filtering.
+ */
+enum RuntimeFilterType {
+  BLOOM_FILTER = 1;
+  VALUE_LIST = 2;
+  VALUE_LIST_WITH_BLOOM_FILTER = 3;
+}
+
+/**
+ * List of column names and the type of filter that applies to these columns
+ */
+message CompositeColumnFilter {
+  optional RuntimeFilterType filterType = 1;
+  repeated string columns = 2; // the order in which the columns are encoded in the serializedFilter
+  optional int64 sizeBytes = 3;
+  optional int64 valueCount = 4;
+}
+
+/**
+ * Filtering information for partition columns and non-partition columns
+ */
+message RuntimeFilter {
+  optional int32 probeScanMajorFragmentId = 1;
+  optional int32 probeScanOperatorId = 2;
+  optional CompositeColumnFilter partitionColumnFilter = 3;
+  repeated CompositeColumnFilter nonPartitionColumnFilter = 4;
+}
+
+/**
+ * Message sent to shrink memory usage
+ * Using a protobuf for extensibility in the future
+ */
+message ShrinkMemoryUsage {
+  optional int64 memory_in_bytes = 1;
+}
+
+message HashDistributionValueCount {
+  optional int64 hash_distribution_key = 1;
+  optional int64 count = 2;
+}
+
+/**
+ * Hash distribution value counts. Used for data skew detection
+ */
+message HashDistributionValueCounts {
+  repeated HashDistributionValueCount hash_distribution_value_counts = 1;
+  optional int64 total_seen_records = 2;
+  optional int64 unique_value_count = 3;
+}
+
+message ClusteringStatus {
+ optional double start_clustering_depth = 1;
+ optional double estimated_ends_clustering_depth = 2;
+}

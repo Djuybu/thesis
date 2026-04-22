@@ -1,0 +1,51 @@
+/*
+ * Copyright (C) 2017-2019 Dremio Corporation
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+syntax = "proto2";
+package com.dremio.sabot.exec.store.iceberg.proto;
+
+option java_package = "com.dremio.sabot.exec.store.iceberg.proto";
+option optimize_for = SPEED;
+
+option java_outer_classname = "IcebergProtobuf";
+
+import "parquet.proto";
+
+message IcebergSchemaField {
+  optional string schema_path = 1;
+  optional int32 id = 2;
+}
+
+message DefaultNameMapping {
+  optional string name = 1;
+  optional int32 id = 2;
+}
+
+message IcebergDatasetXAttr {
+  optional com.dremio.sabot.exec.store.parquet.proto.ParquetDatasetXAttr parquetDatasetXAttr = 1;
+  repeated IcebergSchemaField column_ids = 2;
+  optional string partition_stats_file = 3;  // path to partition stats file for the latest snapshot
+  optional int64 partition_stats_file_size = 4; // size of the partition stats file
+  // extracted from table property "schema.name-mapping.default",
+  // fallback field ids to be used when a data file does not contain field id information
+  repeated DefaultNameMapping default_name_mapping = 5;
+}
+
+message IcebergDatasetSplitXAttr {
+  optional string path = 1;
+  optional bytes extended_property = 2; // source specific information about this split
+  optional string tableName = 3;
+  optional string dbName = 4;
+}

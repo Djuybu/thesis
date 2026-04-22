@@ -1,0 +1,84 @@
+/*
+ * Copyright (C) 2017-2019 Dremio Corporation
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.dremio.provision.kubernetes;
+
+option java_generate_equals_and_hash = true;
+option java_multiple_files = true;
+option java_outer_classname = "ProvisioningKubernetesProtobuf";
+option java_package = "com.dremio.provision.kubernetes";
+option optimize_for = SPEED;
+
+/*
+ * Note that some aspects of the Kubernetes engine spec are stored elsewhere in the Cluster model:
+ * - name -> Cluster.ClusterConfig.name
+ * - engine_id -> Cluster.id.id
+ * - run_id -> Cluster.runId
+ * - idle_timeout -> Cluster.ClusterConfig.shutdownInterval
+ */
+message EngineSpec {
+  required string size = 1;
+  required string target_cpu_capacity = 2;
+  required string resource_allocation_offset = 3;
+  required string spill_storage_size = 4;
+  required string c3_storage_size = 5;
+  required int32 min_replicas = 6;
+  required int32 max_replicas = 7;
+  optional ExecutorPodMetadata executor_pod_metadata = 8;
+  required WlmHints wlm_hints = 9;
+
+  message ExecutorPodMetadata {
+    repeated Label labels = 1;
+    repeated Annotation annotations = 2;
+    repeated Label node_selectors = 3;
+    repeated Toleration tolerations = 4;
+
+    /* Keys and values should follow Kubernetes conventions. */
+    message Label {
+      required string key = 1;
+      optional string value = 2;
+    }
+
+    /* Keys and values should follow Kubernetes conventions. */
+    message Annotation {
+      required string key = 1;
+      optional string value = 2;
+    }
+
+    /* Keys, values, and field combinations should follow Kubernetes conventions. */
+    message Toleration {
+      optional string key = 1;
+      required Operator operator = 2;
+      optional string value = 3;
+      optional Effect effect = 4;
+      optional int64 toleration_seconds = 5;
+
+      enum Operator {
+        EXISTS = 1;
+        EQUAL = 2;
+      }
+
+      enum Effect {
+        NO_SCHEDULE = 1;
+        PREFER_NO_SCHEDULE = 2;
+        NO_EXECUTE = 3;
+      }
+    }
+  }
+
+  message WlmHints {
+    required int32 executors_per_replica = 1;
+  }
+}

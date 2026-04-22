@@ -23,7 +23,9 @@ import io.protostuff.ByteString;
  * Helper methods for serializing/deserializing {@link
  * com.dremio.service.accelerator.proto.AccelerationDetails}
  */
-public class AccelerationDetailsUtils {
+public final class AccelerationDetailsUtils {
+  private AccelerationDetailsUtils() {}
+
   private static final ProtostuffSerializer<AccelerationDetails> SERIALIZER =
       new ProtostuffSerializer<>(AccelerationDetails.getSchema());
 

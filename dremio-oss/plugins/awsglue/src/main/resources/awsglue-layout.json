@@ -1,0 +1,260 @@
+{
+  "sourceType": "AWSGLUE",
+  "tags": [
+  ],
+  "metadataRefresh": {
+    "datasetDiscovery": true
+  },
+  "form": {
+    "tabs": [
+      {
+        "name": "General",
+        "isGeneral": true,
+        "sections": [
+          {
+            "name": "AWS Region Selection",
+            "elements": [
+              {
+                "propName": "config.regionNameSelection",
+                "uiType": "container_selection",
+                "selectorType": "select",
+                "options": [
+                  {
+                    "value": "US_EAST_2",
+                    "container": {}
+                  },
+                  {
+                    "value": "US_EAST_1",
+                    "container": {}
+                  },
+                  {
+                    "value": "US_WEST_1",
+                    "container": {}
+                  },
+                  {
+                    "value": "US_WEST_2",
+                    "container": {}
+                  },
+                  {
+                    "value": "AF_SOUTH_1",
+                    "container": {}
+                  },
+                  {
+                    "value": "AP_EAST_1",
+                    "container": {}
+                  },
+                  {
+                    "value": "AP_SOUTH_1",
+                    "container": {}
+                  },
+                  {
+                    "value": "AP_SOUTH_2",
+                    "container": {}
+                  },
+                  {
+                    "value": "AP_NORTHEAST_3",
+                    "container": {}
+                  },
+                  {
+                    "value": "AP_NORTHEAST_2",
+                    "container": {}
+                  },
+                  {
+                    "value": "AP_SOUTHEAST_1",
+                    "container": {}
+                  },
+                  {
+                    "value": "AP_SOUTHEAST_2",
+                    "container": {}
+                  },
+                  {
+                    "value": "AP_SOUTHEAST_3",
+                    "container": {}
+                  },
+                  {
+                    "value": "AP_SOUTHEAST_4",
+                    "container": {}
+                  },
+                  {
+                    "value": "AP_NORTHEAST_1",
+                    "container": {}
+                  },
+                  {
+                    "value": "CA_CENTRAL_1",
+                    "container": {}
+                  },
+                  {
+                    "value": "CN_NORTH_1",
+                    "container": {}
+                  },
+                  {
+                    "value": "CN_NORTHWEST_1",
+                    "container": {}
+                  },
+                  {
+                    "value": "EU_CENTRAL_1",
+                    "container": {}
+                  },
+                  {
+                    "value": "EU_CENTRAL_2",
+                    "container": {}
+                  },
+                  {
+                    "value": "EU_WEST_1",
+                    "container": {}
+                  },
+                  {
+                    "value": "EU_WEST_2",
+                    "container": {}
+                  },
+                  {
+                    "value": "EU_SOUTH_1",
+                    "container": {}
+                  },
+                  {
+                    "value": "EU_SOUTH_2",
+                    "container": {}
+                  },
+                  {
+                    "value": "EU_WEST_3",
+                    "container": {}
+                  },
+                  {
+                    "value": "EU_NORTH_1",
+                    "container": {}
+                  },
+                  {
+                    "value": "IL_CENTRAL_1",
+                    "container": {}
+                  },
+                  {
+                    "value": "ME_CENTRAL_1",
+                    "container": {}
+                  },
+                  {
+                    "value": "ME_SOUTH_1",
+                    "container": {}
+                  },
+                  {
+                    "value": "SA_EAST_1",
+                    "container": {}
+                  },
+                  {
+                    "value": "US_GOV_EAST_1",
+                    "container": {}
+                  },
+                  {
+                    "value": "US_GOV_WEST_1",
+                    "container": {}
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "Authentication",
+            "elements": [
+              {
+                "propName": "config.credentialType",
+                "uiType": "container_selection",
+                "options": [
+                  {
+                    "value": "ACCESS_KEY",
+                    "container": {
+                      "elements": [
+                        {
+                          "propName": "config.accessKey",
+                          "size": "full",
+                          "errMsg": "Both access secret and key are required for aws glue catalog."
+                        },
+                        {
+                          "propName": "config.accessSecret",
+                          "size": "full",
+                          "errMsg": "Both access secret and key are required for aws glue catalog.",
+                          "secure": true
+                        },
+                        {
+                          "propName": "config.assumedRoleARN",
+                          "size": "full",
+                          "validate": {
+                            "isRequired": false
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "value": "EC2_METADATA",
+                    "container": {
+                      "elements": [
+                        {
+                          "propName": "config.assumedRoleARN",
+                          "size": "full",
+                          "validate": {
+                            "isRequired": false
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "value": "AWS_PROFILE",
+                    "container": {
+                      "elements": [
+                        {
+                          "propName": "config.awsProfile",
+                          "label": "AWS Profile (optional)",
+                          "placeholder": "default",
+                          "size": "half",
+                          "validate": {
+                            "isRequired": false
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              {
+                "propName": "config.secure"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Advanced Options",
+        "sections": [
+          {
+            "elements": [
+              {
+                "propName": "config.enableAsync"
+              }
+            ]
+          },
+          {
+            "elements": [
+              {
+                "emptyLabel": "No properties added",
+                "addLabel": "Add property",
+                "propName": "config.propertyList"
+              }
+            ]
+          },
+          {
+            "name": "Cache Options",
+            "checkboxController": "enableAsync",
+            "elements": [
+              {
+                "propName": "config.isCachingEnabled"
+              },
+              {
+                "propName": "config.maxCacheSpacePct"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

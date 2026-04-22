@@ -71,22 +71,22 @@ public class ReflectionExpander {
   private static Map<String, ViewFieldType> computeFieldTypes(
       final DatasetConfig dataset, final RelNode plan) {
     // based off AnalysisState
-    List<ViewFieldType> fields = ViewFieldsHelper.getViewFields(dataset);
-    if (fields == null || fields.isEmpty()) {
-      fields = Views.viewToFieldTypes(Views.relDataTypeToFieldType(plan.getRowType()));
+    List<ViewFieldType> viewFields = ViewFieldsHelper.getViewFields(dataset);
+    if (viewFields == null || viewFields.isEmpty()) {
+      viewFields = Views.viewToFieldTypes(Views.relDataTypeToFieldType(plan.getRowType()));
     }
-    fields = removeUpdateColumn(fields);
+    viewFields = removeUpdateColumn(viewFields);
 
     Preconditions.checkState(
-        plan.getRowType().getFieldCount() == fields.size(),
+        plan.getRowType().getFieldCount() == viewFields.size(),
         String.format(
             "Found mismatching number of FieldTypes (%d) to RelDataTypes (%d):  %s, %s",
-            fields.size(),
+            viewFields.size(),
             plan.getRowType().getFieldCount(),
-            fields,
+            viewFields,
             plan.getRowType().toString()));
     return Maps.uniqueIndex(
-        fields,
+        viewFields,
         new Function<ViewFieldType, String>() {
           @Override
           public String apply(ViewFieldType field) {
@@ -96,9 +96,9 @@ public class ReflectionExpander {
   }
 
   public ReflectionExpander(final RelNode view, DatasetConfig dataset) {
-    Map<String, ViewFieldType> fields = computeFieldTypes(dataset, view);
+    Map<String, ViewFieldType> computedFields = computeFieldTypes(dataset, view);
     this.view = view;
-    this.fields = Preconditions.checkNotNull(fields, "fields is required");
+    this.fields = Preconditions.checkNotNull(computedFields, "fields is required");
     this.mappings =
         FluentIterable.from(view.getRowType().getFieldList())
             .uniqueIndex(
@@ -122,11 +122,11 @@ public class ReflectionExpander {
   private RelNode expandRaw(final ReflectionGoal goal) {
     Preconditions.checkArgument(goal.getType() == ReflectionType.RAW, "required raw reflection");
 
-    final List<ReflectionField> fields =
+    final List<ReflectionField> displayFields =
         AccelerationUtils.selfOrEmpty(goal.getDetails().getDisplayFieldList());
 
     final List<String> names =
-        fields.stream().map(field -> field.getName()).collect(Collectors.toList());
+        displayFields.stream().map(field -> field.getName()).collect(Collectors.toList());
 
     final List<RexInputRef> projections =
         names.stream()
@@ -157,7 +157,7 @@ public class ReflectionExpander {
     // use it
     // (i) if we need to a timestamp dimension to date
     // (ii) to project a literal for to be used in sum0(1) for accelerating count(1), sum(1) queries
-    final List<RelDataTypeField> fields = view.getRowType().getFieldList();
+    final List<RelDataTypeField> dataTypeFields = view.getRowType().getFieldList();
 
     final Map<String, ReflectionDimensionField> dimensions =
         FluentIterable.from(dimensionFieldList)
@@ -172,7 +172,7 @@ public class ReflectionExpander {
     final RexBuilder rexBuilder = view.getCluster().getRexBuilder();
     final RelDataTypeFactory typeFactory = view.getCluster().getTypeFactory();
     final List<RexNode> projects =
-        FluentIterable.from(fields)
+        FluentIterable.from(dataTypeFields)
             .transform(
                 new Function<RelDataTypeField, RexNode>() {
                   @Override
@@ -217,7 +217,7 @@ public class ReflectionExpander {
             .toList();
 
     final List<String> fieldNames =
-        FluentIterable.from(fields)
+        FluentIterable.from(dataTypeFields)
             .transform(
                 new Function<RelDataTypeField, String>() {
                   @Override

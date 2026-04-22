@@ -21,7 +21,9 @@ import com.google.common.collect.ImmutableList;
 import java.util.List;
 
 /** reflection related {@link IndexKey}s */
-public class ReflectionIndexKeys {
+public final class ReflectionIndexKeys {
+  private ReflectionIndexKeys() {}
+
   static final IndexKey MATERIALIZATION_ID =
       IndexKey.newBuilder("mid", "MATERIALIZATION_ID", String.class).build();
   static final IndexKey MATERIALIZATION_STATE =

@@ -79,7 +79,7 @@ public class TestReflectionGoalChecker {
                 new ReflectionGoalHash(
                     "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"));
 
-    assertTrue(ReflectionGoalChecker.Instance.checkHash(goal, entry));
+    assertTrue(ReflectionGoalChecker.INSTANCE.checkHash(goal, entry));
   }
 
   @Test
@@ -87,13 +87,13 @@ public class TestReflectionGoalChecker {
     ReflectionGoal goal = new ReflectionGoal();
     ReflectionEntry entry = new ReflectionEntry();
 
-    assertFalse(ReflectionGoalChecker.Instance.checkHash(goal, entry));
+    assertFalse(ReflectionGoalChecker.INSTANCE.checkHash(goal, entry));
   }
 
   @Test
   public void testHashingEmptyGoal() {
     ReflectionGoal goal = new ReflectionGoal();
-    ReflectionGoalHash actual = ReflectionGoalChecker.Instance.calculateReflectionGoalVersion(goal);
+    ReflectionGoalHash actual = ReflectionGoalChecker.INSTANCE.calculateReflectionGoalVersion(goal);
     assertEquals(
         "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", actual.getHash());
   }
@@ -108,7 +108,7 @@ public class TestReflectionGoalChecker {
             .setVersion(System.currentTimeMillis())
             .setName("Name");
 
-    ReflectionGoalHash actual = ReflectionGoalChecker.Instance.calculateReflectionGoalVersion(goal);
+    ReflectionGoalHash actual = ReflectionGoalChecker.INSTANCE.calculateReflectionGoalVersion(goal);
     assertEquals(
         "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", actual.getHash());
   }
@@ -117,7 +117,7 @@ public class TestReflectionGoalChecker {
   public void testHashingEmptyWithBoostEnabledGoal() {
     ReflectionGoal goal = new ReflectionGoal();
 
-    ReflectionGoalHash actual = ReflectionGoalChecker.Instance.calculateReflectionGoalVersion(goal);
+    ReflectionGoalHash actual = ReflectionGoalChecker.INSTANCE.calculateReflectionGoalVersion(goal);
     assertEquals(
         "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", actual.getHash());
   }
@@ -126,7 +126,7 @@ public class TestReflectionGoalChecker {
   public void testHashingWithUniqueIdGoal() {
     ReflectionGoal goal = new ReflectionGoal().setId(new ReflectionId("xxx"));
 
-    ReflectionGoalHash actual = ReflectionGoalChecker.Instance.calculateReflectionGoalVersion(goal);
+    ReflectionGoalHash actual = ReflectionGoalChecker.INSTANCE.calculateReflectionGoalVersion(goal);
     assertEquals(
         "a9171a2d1e967b50401388ba1271fba59386adac44078e0a0047f9111167f1a2", actual.getHash());
   }
@@ -156,9 +156,9 @@ public class TestReflectionGoalChecker {
                                 .setGranularity(DimensionGranularity.DATE))));
 
     ReflectionGoalHash actual1 =
-        ReflectionGoalChecker.Instance.calculateReflectionGoalVersion(goal1);
+        ReflectionGoalChecker.INSTANCE.calculateReflectionGoalVersion(goal1);
     ReflectionGoalHash actual2 =
-        ReflectionGoalChecker.Instance.calculateReflectionGoalVersion(goal2);
+        ReflectionGoalChecker.INSTANCE.calculateReflectionGoalVersion(goal2);
 
     assertEquals(
         "We expect difrrent values for different details",

@@ -44,7 +44,8 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.util.Pair;
 
-public class DatasetHashUtils {
+public final class DatasetHashUtils {
+  private DatasetHashUtils() {}
 
   /**
    * @return true if the dataset type is PHYSICAL_*

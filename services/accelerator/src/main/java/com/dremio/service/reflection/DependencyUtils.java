@@ -45,7 +45,8 @@ import java.util.Set;
 import java.util.UUID;
 
 /** Helper functions to deal with reflection dependencies */
-public class DependencyUtils {
+public final class DependencyUtils {
+  private DependencyUtils() {}
 
   private static final Predicate<DependencyEntry> IS_REFLECTION =
       new Predicate<DependencyEntry>() {

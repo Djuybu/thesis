@@ -1,0 +1,151 @@
+{
+  "sourceType": "AZURE_STORAGE",
+  "metadataRefresh": {
+    "datasetDiscovery": false,
+    "isFileSystemSource": true
+  },
+  "form": {
+    "tabs": [
+      {
+        "name": "General",
+        "isGeneral": true,
+        "sections": [
+          {
+            "name": "Connection",
+            "elements": [
+              {
+                "propName": "config.accountName"
+              },
+              {
+                "tooltip": "Force encrypted connection over SSL",
+                "propName": "config.enableSSL"
+              },
+              {
+                "propName": "config.accountKind"
+              }
+            ]
+          },
+          {
+            "name": "Authentication",
+            "tooltip": "",
+            "elements": [
+              {
+                "propName": "config.credentialsType",
+                "uiType": "container_selection",
+                "options": [
+                  {
+                    "value": "ACCESS_KEY",
+                    "container": {
+                      "elements": [
+                        {
+                          "propName": "config.accessKey",
+                          "size": "full",
+                          "errMsg": "Access key is required for Azure storage accounts"
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "value": "AZURE_ACTIVE_DIRECTORY",
+                    "container": {
+                      "elements": [
+                        {
+                          "propName": "config.clientId",
+                          "size": "full",
+                          "errMsg": "ApplicationId is required for Microsoft Entra ID OAuth 2.0"
+                        },
+                        {
+                          "propName": "config.tokenEndpoint",
+                          "size": "full",
+                          "errMsg": "Token endpoint is required for Microsoft Entra ID OAuth 2.0"
+                        },
+                        {
+                          "propName": "config.clientSecret",
+                          "size": "full",
+                          "errMsg": "Client secret is required for Microsoft Entra ID OAuth 2.0"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Advanced Options",
+        "sections": [
+          {
+            "elements": [
+              {
+                "propName": "config.enableAsync"
+              },
+              {
+                "propName": "config.isPartitionInferenceEnabled"
+              }
+            ]
+          },
+          {
+            "elements": [
+              {
+                "propName": "config.rootPath"
+              }
+            ]
+          },
+          {
+            "elements": [
+              {
+                "propName": "config.defaultCtasFormat",
+                "uiType": "container_selection",
+                "selectorType": "select",
+                "options": [
+                  {
+                    "value": "ICEBERG",
+                    "container": {}
+                  },
+                  {
+                    "value": "PARQUET",
+                    "container": {}
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "elements": [
+              {
+                "label": "Advanced Properties",
+                "emptyLabel": "No properties added",
+                "addLabel": "Add property",
+                "propName": "config.propertyList"
+              }
+            ]
+          },
+          {
+            "elements": [
+              {
+                "emptyLabel": "No values added",
+                "addLabel": "Add value",
+                "uiType": "value_list",
+                "propName": "config.containers[]"
+              }
+            ]
+          },
+          {
+            "name": "Cache Options",
+            "checkboxController": "enableAsync",
+            "elements": [
+              {
+                "propName": "config.isCachingEnabled"
+              },
+              {
+                "propName": "config.maxCacheSpacePct"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

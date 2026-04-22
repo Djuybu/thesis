@@ -161,7 +161,7 @@ public class ReflectionManagerFactory {
         wakeUpCallback,
         provider,
         allocator,
-        ReflectionGoalChecker.Instance,
+        ReflectionGoalChecker.INSTANCE,
         newRefreshStartHandler(
             catalogService.get(),
             jobsService.get(),

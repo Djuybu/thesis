@@ -1,0 +1,36 @@
+{
+    head:{
+        type:"PHYSICAL",
+        version:"1",
+        generator:{
+            type:"manual"
+        }
+    },
+    graph:[
+        {
+            id:1,
+            pop:"mock-scan",
+            url: "http://apache.org",
+            entries:[
+                {records: 100, types: [
+                  {name: "blue", type: "BIT", mode: "REQUIRED"},
+                  {name: "red", type: "BIGINT", mode: "REQUIRED"},
+                  {name: "green", type: "INT", mode: "OPTIONAL"}
+                ]}
+            ],
+            props: {"operatorId": 1}
+        },
+        {
+            id:2,
+            child: 1,
+            pop:"selection-vector-remover",
+            props: {"operatorId": 2, "targetBatchSize":1024, "schemaHashCode": -1049233815}
+        },
+        {
+            id: 3,
+            child: 2,
+            pop: "screen",
+            props: {"operatorId": 3, "schemaHashCode": -1049233815}
+        }
+    ]
+}

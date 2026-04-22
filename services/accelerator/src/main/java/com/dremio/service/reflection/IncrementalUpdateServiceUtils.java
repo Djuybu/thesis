@@ -42,7 +42,8 @@ import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.sql.SqlOperator;
 
 /** Contains various utilities for acceleration incremental updates */
-public class IncrementalUpdateServiceUtils {
+public final class IncrementalUpdateServiceUtils {
+  private IncrementalUpdateServiceUtils() {}
 
   private static final String INCREMENTAL_CHECKER =
       "dremio.reflection.refresh.incremental-checker.class";

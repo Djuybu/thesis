@@ -1,0 +1,609 @@
+/*
+ * Copyright (C) 2017-2019 Dremio Corporation
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.dremio.exec.planner.physical;
+
+import com.carrotsearch.hppc.IntIntHashMap;
+import com.dremio.common.expression.FieldReference;
+import com.dremio.common.expression.PathSegment;
+import com.dremio.common.expression.PathSegment.ArraySegment;
+import com.dremio.common.expression.PathSegment.NameSegment;
+import com.dremio.common.expression.SchemaPath;
+import com.dremio.common.logical.data.Order.Ordering;
+import com.dremio.exec.planner.physical.visitor.BasePrelVisitor;
+import com.dremio.exec.planner.physical.visitor.ExcessiveExchangeIdentifier;
+import com.dremio.exec.record.BatchSchema.SelectionVectorMode;
+import com.dremio.exec.store.iceberg.IcebergManifestListPrel;
+import com.dremio.exec.store.iceberg.IcebergManifestScanPrel;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
+import org.apache.calcite.linq4j.Ord;
+import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelOptPlanner;
+import org.apache.calcite.plan.RelOptRuleCall;
+import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.rel.RelCollation;
+import org.apache.calcite.rel.RelFieldCollation;
+import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rel.type.RelDataTypeFactory;
+import org.apache.calcite.rel.type.RelDataTypeField;
+import org.apache.calcite.rex.RexBuilder;
+import org.apache.calcite.rex.RexCall;
+import org.apache.calcite.rex.RexFieldAccess;
+import org.apache.calcite.rex.RexInputRef;
+import org.apache.calcite.rex.RexLiteral;
+import org.apache.calcite.rex.RexLocalRef;
+import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.rex.RexShuttle;
+import org.apache.calcite.rex.RexVisitorImpl;
+
+public class PrelUtil {
+
+  public static List<Ordering> getOrdering(RelCollation collation, RelDataType rowType) {
+    List<Ordering> orderExpr = Lists.newArrayList();
+
+    final List<String> childFields = rowType.getFieldNames();
+
+    for (RelFieldCollation fc : collation.getFieldCollations()) {
+      FieldReference fr = new FieldReference(childFields.get(fc.getFieldIndex()));
+      orderExpr.add(new Ordering(fc.getDirection(), fr, fc.nullDirection));
+    }
+
+    return orderExpr;
+  }
+
+  public static Iterator<Prel> iter(RelNode... nodes) {
+    return (Iterator<Prel>) (Object) Arrays.asList(nodes).iterator();
+  }
+
+  public static Iterator<Prel> iter(List<RelNode> nodes) {
+    return (Iterator<Prel>) (Object) nodes.iterator();
+  }
+
+  public static PlannerSettings getSettings(final RelOptCluster cluster) {
+    return getPlannerSettings(cluster);
+  }
+
+  public static PlannerSettings getPlannerSettings(final RelOptCluster cluster) {
+    return cluster.getPlanner().getContext().unwrap(PlannerSettings.class);
+  }
+
+  public static PlannerSettings getPlannerSettings(RelOptPlanner planner) {
+    return planner.getContext().unwrap(PlannerSettings.class);
+  }
+
+  /**
+   * Add RR exchanges to all the inputs of a UnionAll. If any of the input qualifies for RR, we will
+   * add RR to all the inputs.
+   *
+   * @param plannerSettings PlannerSettings for getting options
+   * @param inputs UnionAll inputs
+   * @return List of inputs after adding RR exchanges, if qualified
+   */
+  @WithSpan("convert-unionAll-inputs")
+  public static List<RelNode> convertUnionAllInputs(
+      PlannerSettings plannerSettings, Prel... inputs) {
+    List<RelNode> inputList = new ArrayList<>();
+    boolean unionAllRR =
+        plannerSettings.getOptions().getOption(PlannerSettings.ENABLE_UNIONALL_ROUND_ROBIN);
+    boolean canAddRoundRobinExchange =
+        unionAllRR && canAddRoundRobinExchange(plannerSettings, inputs);
+    for (Prel input : inputs) {
+      if (canAddRoundRobinExchange) {
+        inputList.add(new RoundRobinExchangePrel(input.getCluster(), input.getTraitSet(), input));
+      } else {
+        inputList.add(input);
+      }
+    }
+    return inputList;
+  }
+
+  /**
+   * Check if RR can be added to all the inputs. For trivial singleton plan we don't need to add a
+   * RR.
+   */
+  public static boolean canAddRoundRobinExchange(PlannerSettings plannerSettings, Prel... inputs) {
+    for (RelNode relNode : inputs) {
+      RelNode prelCopy = relNode.copy(relNode.getTraitSet(), relNode.getInputs());
+      Prel rr = new RoundRobinExchangePrel(prelCopy.getCluster(), prelCopy.getTraitSet(), prelCopy);
+      Prel tryToRemoveRR =
+          ExcessiveExchangeIdentifier.removeExcessiveEchanges(rr, plannerSettings.getSliceTarget());
+      if (tryToRemoveRR instanceof RoundRobinExchangePrel) {
+        // If we can add RR to any input, we add it to all the inputs.
+        return true;
+      }
+    }
+    return false;
+  }
+
+  public static Prel addLimitPrel(Prel input, long fetchSize) {
+    RexBuilder builder = input.getCluster().getRexBuilder();
+    return new LimitPrel(
+        input.getCluster(),
+        input.getTraitSet(),
+        input,
+        builder.makeBigintLiteral(BigDecimal.ZERO),
+        builder.makeBigintLiteral(BigDecimal.valueOf(fetchSize)));
+  }
+
+  public static Prel removeSvIfRequired(Prel prel, SelectionVectorMode... allowed) {
+    SelectionVectorMode current = prel.getEncoding();
+    for (SelectionVectorMode m : allowed) {
+      if (current == m) {
+        return prel;
+      }
+    }
+    return new SelectionVectorRemoverPrel(prel);
+  }
+
+  public static int getLastUsedColumnReference(List<RexNode> projects) {
+    LastUsedRefVisitor lastUsed = new LastUsedRefVisitor();
+    for (RexNode rex : projects) {
+      rex.accept(lastUsed);
+    }
+    return lastUsed.getLastUsedReference();
+  }
+
+  public static ProjectPushInfo getColumns(
+      RelDataType rowType, List<RexNode> projects, boolean pushItemOperator) {
+    final List<String> fieldNames = rowType.getFieldNames();
+    if (fieldNames.isEmpty()) {
+      return null;
+    }
+
+    // Remove delta lake dataset check after DX-93768 gets resolved.
+    RefFieldsVisitor v = new RefFieldsVisitor(rowType, pushItemOperator);
+    for (RexNode exp : projects) {
+      if (pushItemOperator) {
+        v.addColumn(exp.accept(v));
+      } else {
+        exp.accept(v);
+      }
+    }
+
+    if (v.hasNonLiteralIndex) {
+      // This logic is not very robust and doesn't know how to handle non literal indexes in item
+      // call.
+      return null;
+    }
+
+    return v.getInfo();
+  }
+
+  public static class DesiredField {
+    public final int origIndex;
+    public final String name;
+    public final RelDataTypeField field;
+
+    public DesiredField(int origIndex, String name, RelDataTypeField field) {
+      super();
+      this.origIndex = origIndex;
+      this.name = name;
+      this.field = field;
+    }
+
+    @Override
+    public int hashCode() {
+      final int prime = 31;
+      int result = 1;
+      result = prime * result + ((field == null) ? 0 : field.hashCode());
+      result = prime * result + ((name == null) ? 0 : name.hashCode());
+      result = prime * result + origIndex;
+      return result;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (this == obj) {
+        return true;
+      }
+      if (obj == null) {
+        return false;
+      }
+      if (getClass() != obj.getClass()) {
+        return false;
+      }
+      DesiredField other = (DesiredField) obj;
+      if (field == null) {
+        if (other.field != null) {
+          return false;
+        }
+      } else if (!field.equals(other.field)) {
+        return false;
+      }
+      if (name == null) {
+        if (other.name != null) {
+          return false;
+        }
+      } else if (!name.equals(other.name)) {
+        return false;
+      }
+      if (origIndex != other.origIndex) {
+        return false;
+      }
+      return true;
+    }
+  }
+
+  public static class ProjectPushInfo {
+    public final List<SchemaPath> columns;
+    public final List<RexNode> inputsRefs;
+    public final List<DesiredField> desiredFields;
+    public final InputRewriter rewriter;
+    private final List<String> fieldNames;
+    private final List<RelDataType> types;
+
+    public ProjectPushInfo(
+        List<SchemaPath> columns,
+        ImmutableList<DesiredField> desiredFields,
+        ImmutableList<RexNode> inputRefs) {
+      super();
+      this.columns = columns;
+      this.desiredFields = desiredFields;
+      this.inputsRefs = inputRefs;
+
+      this.fieldNames = Lists.newArrayListWithCapacity(desiredFields.size());
+      this.types = Lists.newArrayListWithCapacity(desiredFields.size());
+      IntIntHashMap oldToNewIds = new IntIntHashMap();
+
+      int i = 0;
+      for (DesiredField f : desiredFields) {
+        fieldNames.add(f.name);
+        types.add(f.field.getType());
+        oldToNewIds.put(f.origIndex, i);
+        i++;
+      }
+      this.rewriter = new InputRewriter(oldToNewIds);
+    }
+
+    public List<String> getFieldNames() {
+      return ImmutableList.copyOf(fieldNames);
+    }
+
+    public InputRewriter getInputRewriter() {
+      return rewriter;
+    }
+
+    public boolean isStarQuery() {
+      for (SchemaPath column : columns) {
+        if (column.getRootSegment().getPath().startsWith("*")) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    public RelDataType createNewRowType(RelDataTypeFactory factory) {
+      return factory.createStructType(types, fieldNames);
+    }
+  }
+
+  // Simple visitor class to determine the last used reference in the expression
+  private static class LastUsedRefVisitor extends RexVisitorImpl<Void> {
+
+    int lastUsedRef = -1;
+
+    protected LastUsedRefVisitor() {
+      super(true);
+    }
+
+    @Override
+    public Void visitInputRef(RexInputRef inputRef) {
+      lastUsedRef = Math.max(lastUsedRef, inputRef.getIndex());
+      return null;
+    }
+
+    @Override
+    public Void visitCall(RexCall call) {
+      for (RexNode operand : call.operands) {
+        operand.accept(this);
+      }
+      return null;
+    }
+
+    public int getLastUsedReference() {
+      return lastUsedRef;
+    }
+  }
+
+  /** Visitor that finds the set of inputs that are used. */
+  private static class RefFieldsVisitor extends RexVisitorImpl<PathSegment> {
+    private final Set<SchemaPath> columns;
+    private final List<RexNode> inputRefs = Lists.newArrayList();
+    private final List<String> fieldNames;
+    private final List<RelDataTypeField> fields;
+    private final Set<DesiredField> desiredFields;
+    private final Map<String, Integer> fieldNameMap = new HashMap<>();
+    private boolean hasNonLiteralIndex = false;
+    private final boolean includeItemOperator;
+
+    public RefFieldsVisitor(RelDataType rowType, boolean includeItemOperator) {
+      super(true);
+      this.fieldNames = rowType.getFieldNames();
+      this.fields = rowType.getFieldList();
+      Ord.zip(fieldNames).forEach(o -> fieldNameMap.put(o.e.toLowerCase(), o.i));
+      Comparator<SchemaPath> schemaPathComparator =
+          Comparator.comparingInt(
+                  (SchemaPath path) ->
+                      fieldNameMap.get(path.getRootSegment().getPath().toLowerCase()))
+              .thenComparing(path -> path);
+      this.columns = new TreeSet<>(schemaPathComparator);
+      Comparator<DesiredField> desiredFieldComparator =
+          Comparator.comparingInt(field -> fieldNameMap.get(field.name.toLowerCase()));
+      this.desiredFields = new TreeSet<>(desiredFieldComparator);
+      this.includeItemOperator = includeItemOperator;
+    }
+
+    public void addColumn(PathSegment segment) {
+      if (segment != null && segment instanceof NameSegment) {
+        columns.add(new SchemaPath((NameSegment) segment));
+      }
+    }
+
+    public ProjectPushInfo getInfo() {
+      return new ProjectPushInfo(
+          ImmutableList.copyOf(columns),
+          ImmutableList.copyOf(desiredFields),
+          ImmutableList.copyOf(inputRefs));
+    }
+
+    @Override
+    public PathSegment visitInputRef(RexInputRef inputRef) {
+      int index = inputRef.getIndex();
+      String name = fieldNames.get(index);
+      RelDataTypeField field = fields.get(index);
+      DesiredField f = new DesiredField(index, name, field);
+      desiredFields.add(f);
+      inputRefs.add(inputRef);
+      NameSegment nameSegment = new NameSegment(name);
+      if (!includeItemOperator) {
+        addColumn(nameSegment);
+      }
+      return nameSegment;
+    }
+
+    @Override
+    public PathSegment visitFieldAccess(RexFieldAccess fieldAccess) {
+      PathSegment mapOrArray = fieldAccess.getReferenceExpr().accept(this);
+      if (mapOrArray != null) {
+        if (fieldAccess.getField() != null) {
+          return mapOrArray.cloneWithNewChild(new NameSegment(fieldAccess.getField().getName()));
+        }
+      }
+      return null;
+    }
+
+    @Override
+    public PathSegment visitCall(RexCall call) {
+      String operatorName = call.getOperator().getName();
+      boolean indexingFunction = "ITEM".equals(operatorName) || "DOT".equals(operatorName);
+      if (!indexingFunction) {
+        if (!includeItemOperator) {
+          return super.visitCall(call);
+        }
+        for (RexNode operand : call.operands) {
+          addColumn(operand.accept(this));
+        }
+        return null;
+      }
+
+      if (!(call.getOperands().get(1) instanceof RexLiteral)) {
+        hasNonLiteralIndex = true;
+        return null;
+      }
+
+      RexNode source = call.getOperands().get(0);
+      PathSegment visitedSource = source.accept(this);
+      if (visitedSource == null) {
+        return null;
+      }
+
+      PathSegment childSegement = convertLiteral((RexLiteral) call.operands.get(1));
+      return visitedSource.cloneWithNewChild(childSegement);
+    }
+
+    private PathSegment convertLiteral(RexLiteral literal) {
+      switch (literal.getType().getSqlTypeName().getFamily()) {
+        case CHARACTER:
+          return new NameSegment(RexLiteral.stringValue(literal));
+        case NUMERIC:
+          return new ArraySegment(RexLiteral.intValue(literal));
+        default:
+          throw new UnsupportedOperationException(
+              "Unknown literal type: " + literal.getType().getSqlTypeName().getFamily());
+      }
+    }
+  }
+
+  public static RelTraitSet fixTraits(RelOptRuleCall call, RelTraitSet set) {
+    return fixTraits(call.getPlanner(), set);
+  }
+
+  public static RelTraitSet fixTraits(RelOptPlanner cluster, RelTraitSet set) {
+    if (getPlannerSettings(cluster).isSingleMode()) {
+      return set.replace(DistributionTrait.ANY);
+    } else {
+      return set;
+    }
+  }
+
+  public static class InputRefRemap {
+    private int oldIndex;
+    private int newIndex;
+
+    public InputRefRemap(int oldIndex, int newIndex) {
+      super();
+      this.oldIndex = oldIndex;
+      this.newIndex = newIndex;
+    }
+
+    public int getOldIndex() {
+      return oldIndex;
+    }
+
+    public int getNewIndex() {
+      return newIndex;
+    }
+  }
+
+  public static class InputRewriter extends RexShuttle {
+
+    final IntIntHashMap map;
+
+    public InputRewriter(IntIntHashMap map) {
+      super();
+      this.map = map;
+    }
+
+    @Override
+    public RexNode visitInputRef(RexInputRef inputRef) {
+      return new RexInputRef(map.get(inputRef.getIndex()), inputRef.getType());
+    }
+
+    @Override
+    public RexNode visitLocalRef(RexLocalRef localRef) {
+      return new RexInputRef(map.get(localRef.getIndex()), localRef.getType());
+    }
+  }
+
+  // If Prel contains certain call of given name.
+  public static boolean containsCall(Prel prel, String callName) {
+    return prel.accept(new ContainsCallVisitor(callName), null);
+  }
+
+  // Simple visitor to determine if Prel contains certain call of given name.
+  private static final class ContainsCallVisitor
+      extends BasePrelVisitor<Boolean, Void, RuntimeException> {
+    private boolean found = false;
+    private final String callName;
+
+    private ContainsCallVisitor(String callName) {
+      this.callName = callName;
+    }
+
+    private RexShuttle finder =
+        new RexShuttle() {
+          @Override
+          public RexNode visitCall(RexCall call) {
+            if (call.getOperator().getName().equalsIgnoreCase(callName)) {
+              found = true;
+            }
+            return super.visitCall(call);
+          }
+        };
+
+    @Override
+    public Boolean visitPrel(Prel prel, Void notUsed) throws RuntimeException {
+      prel.accept(finder);
+      if (found) {
+        return true;
+      }
+      for (Prel child : prel) {
+        if (child.accept(this, null)) {
+          return true;
+        }
+      }
+      return false;
+    }
+  }
+
+  /*
+   Visitor to look for count star optimization in the given Prel.
+   If present, replaces the optimized part of the plan with the record count from table metadata.
+  */
+  public static class CntStrOptimization extends BasePrelVisitor<Prel, Void, RuntimeException> {
+
+    RelOptCluster cluster;
+
+    public CntStrOptimization(RelOptCluster cluster) {
+      this.cluster = cluster;
+    }
+
+    @Override
+    public Prel visitTableFunction(TableFunctionPrel prel, Void value) throws RuntimeException {
+      if (prel instanceof IcebergManifestScanPrel) {
+        boolean countStrOptimizationApplied =
+            prel.getRowType().getFieldList().stream().anyMatch(f -> f.getName().endsWith("_str"));
+        if (countStrOptimizationApplied) {
+          List<RexLiteral> recordCountTuple = new ArrayList<>();
+          prel.getRowType().getFieldList().stream()
+              .filter(f -> !f.getName().endsWith("_str"))
+              .forEach(
+                  f -> recordCountTuple.add(cluster.getRexBuilder().makeNullLiteral(f.getType())));
+          prel.accept(
+              new BasePrelVisitor<Void, Void, RuntimeException>() {
+                @Override
+                public Void visitLeaf(LeafPrel prel, Void value) throws RuntimeException {
+                  if (prel instanceof IcebergManifestListPrel) {
+                    Long recordCount =
+                        ((IcebergManifestListPrel) prel)
+                            .getTableMetadata()
+                            .getReadDefinition()
+                            .getScanStats()
+                            .getRecordCount();
+                    recordCountTuple.add(
+                        cluster.getRexBuilder().makeBigintLiteral(BigDecimal.valueOf(recordCount)));
+                  }
+                  return null;
+                }
+
+                @Override
+                public Void visitPrel(Prel prel, Void value) throws RuntimeException {
+                  prel.forEach(input -> input.accept(this, null));
+                  return null;
+                }
+              },
+              null);
+          return new ValuesPrel(
+              cluster,
+              prel.getTraitSet().plus(DistributionTrait.SINGLETON),
+              prel.getRowType(),
+              ImmutableList.of(recordCountTuple));
+        }
+      }
+      return prel;
+    }
+
+    @Override
+    public Prel visitPrel(Prel prel, Void value) throws RuntimeException {
+      List<RelNode> children = new ArrayList<>();
+      boolean[] update = new boolean[1];
+      prel.forEach(
+          input -> {
+            Prel newInput = input.accept(this, null);
+            if (newInput != input) {
+              update[0] = true;
+            }
+            children.add(newInput);
+          });
+      if (!update[0]) {
+        return prel;
+      }
+      return (Prel) prel.copy(prel.getTraitSet(), children);
+    }
+  }
+}

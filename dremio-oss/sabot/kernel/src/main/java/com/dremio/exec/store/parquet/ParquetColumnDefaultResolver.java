@@ -1,0 +1,138 @@
+/*
+ * Copyright (C) 2017-2019 Dremio Corporation
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.dremio.exec.store.parquet;
+
+import com.dremio.common.expression.PathSegment;
+import com.dremio.common.expression.PathSegment.PathSegmentType;
+import com.dremio.common.expression.SchemaPath;
+import com.google.common.base.Preconditions;
+import java.util.List;
+import org.apache.arrow.vector.ValueVector;
+import org.apache.arrow.vector.complex.ListVector;
+import org.apache.arrow.vector.complex.StructVector;
+import org.apache.arrow.vector.complex.UnionVector;
+import org.apache.parquet.column.ColumnDescriptor;
+import org.apache.parquet.schema.MessageType;
+
+/** This class acts as no-op. This is used in parquet dataset path */
+public class ParquetColumnDefaultResolver implements ParquetColumnResolver {
+  private List<SchemaPath> projectedColumns;
+
+  public ParquetColumnDefaultResolver(List<SchemaPath> projectedColumns) {
+    this.projectedColumns = projectedColumns;
+  }
+
+  @Override
+  public List<SchemaPath> getBatchSchemaProjectedColumns() {
+    return projectedColumns;
+  }
+
+  @Override
+  public List<SchemaPath> getProjectedParquetColumns() {
+    return projectedColumns;
+  }
+
+  @Override
+  public String getBatchSchemaColumnName(String columnInParquetFile) {
+    return columnInParquetFile;
+  }
+
+  @Override
+  public List<String> getBatchSchemaColumnName(List<String> columnInParquetFile) {
+    return columnInParquetFile;
+  }
+
+  @Override
+  public String getParquetColumnName(String name) {
+    return name;
+  }
+
+  @Override
+  public List<SchemaPath> getBatchSchemaColumns(List<SchemaPath> parquestSchemaPaths) {
+    return parquestSchemaPaths;
+  }
+
+  @Override
+  public SchemaPath getBatchSchemaColumnPath(SchemaPath pathInParquetFile) {
+    return pathInParquetFile;
+  }
+
+  @Override
+  public List<String> getNameSegments(SchemaPath schemaPath) {
+    return schemaPath.getNameSegments();
+  }
+
+  @Override
+  public List<String> convertColumnDescriptor(MessageType schema, ColumnDescriptor columnDesc) {
+    return ParquetReaderUtility.convertColumnDescriptor(schema, columnDesc);
+  }
+
+  /**
+   * Convert the given SchemaPath to dotted string representation and return it.
+   *
+   * <pre>
+   * SchemaPath consists of PathSegments, e.g., the SchemaPath representing
+   * a_struct.b_struct.c_list[0] consists of the following PathSegments:
+   * 1. `a_struct` (NameSegment)
+   * 2. `b_struct` (NameSegment)
+   * 3. `c_list` (NameSegment)
+   * 4. [0] (ArraySegment).
+   * </pre>
+   *
+   * @param schemaPath SchemaPath to convert
+   * @param vector Vector corresponding to the root of the SchemaPath
+   * @return Dotted string representation of the given SchemaPath
+   */
+  @Override
+  public String toDotString(SchemaPath schemaPath, ValueVector vector) {
+    // The method uses ValueVector to make some sanity check(s), but otherwise
+    // it silently ignores when the ValueVector is null and continues processing
+    // the remaining PathSegments of the given SchemaPath.
+    // The usage of `(vector instanceof ListVector)` is allowed as instanceof is null-safe.
+
+    StringBuilder pathBuilder = new StringBuilder();
+    boolean isListChild = (vector instanceof ListVector);
+    pathBuilder.append(schemaPath.getRootSegment().getPath());
+    PathSegment seg = schemaPath.getRootSegment().getChild();
+
+    while (seg != null) {
+      pathBuilder.append(".");
+      if (seg.getType().equals(PathSegmentType.ARRAY_INDEX) || isListChild) {
+        pathBuilder.append("list.element");
+        if (vector != null) {
+          vector = ((ListVector) vector).getDataVector();
+        }
+        if (!seg.getType().equals(PathSegmentType.ARRAY_INDEX)) {
+          // planner doesn't always send index with list path segment
+          isListChild = (vector instanceof ListVector);
+          continue;
+        }
+      } else {
+        if (vector instanceof StructVector) {
+          vector = ((StructVector) vector).getChild(seg.getNameSegment().getPath());
+        } else if (vector instanceof UnionVector) {
+          // child is a primitive type, and path won't have any child
+          Preconditions.checkState(seg.getChild() == null, "Unexpected state");
+        }
+        pathBuilder.append(seg.getNameSegment().getPath());
+      }
+      isListChild = (vector instanceof ListVector);
+      seg = seg.getChild();
+    }
+
+    return pathBuilder.toString().toLowerCase();
+  }
+}

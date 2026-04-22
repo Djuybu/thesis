@@ -169,7 +169,7 @@ export class AccelerationAdvanced extends Component {
       const meas = data.measures || [];
 
       // Add new Raw reflection
-      const rawDisplayFields = [...dims, ...meas.map(m => m.name)]
+      const rawDisplayFields = [...dims, ...meas.map((m) => m.name)]
         .filter((d) => !d.includes("$"))
         .map((d) => ({ name: d }));
 
@@ -188,7 +188,10 @@ export class AccelerationAdvanced extends Component {
         .map((d) => ({ name: d }));
       const measureFields = meas
         .filter((d) => !d.name.includes("$"))
-        .map((d) => ({ name: d.name, measureTypeList: d.aggregations || ["SUM", "COUNT"] }));
+        .map((d) => ({
+          name: d.name,
+          measureTypeList: d.aggregations || ["SUM", "COUNT"],
+        }));
       if (dimensionFields.length > 0 || measureFields.length > 0) {
         aggregationReflections.addField({
           type: "AGGREGATION",

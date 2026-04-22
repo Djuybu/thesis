@@ -29,7 +29,7 @@ import java.io.IOException;
  * Checks if a Materialization or Reflection is derived from a particular ReflectionGoal.
  */
 public class ReflectionGoalChecker {
-  public static final ReflectionGoalChecker Instance = new ReflectionGoalChecker();
+  public static final ReflectionGoalChecker INSTANCE = new ReflectionGoalChecker();
 
   private final java.util.function.Function<Output, Output>
       reflectionGoalMaterializationBlackLister =
@@ -82,10 +82,10 @@ public class ReflectionGoalChecker {
   // The goal version might have a copy of the tag from a pre-4.2.0 build of Dremio (prior to the
   // KVStore interface changes that separated out the tag from the value).
   public static boolean checkGoal(ReflectionGoal goal, Materialization materialization) {
-    return Instance.isEqual(goal, materialization.getReflectionGoalVersion());
+    return INSTANCE.isEqual(goal, materialization.getReflectionGoalVersion());
   }
 
   public static boolean checkGoal(ReflectionGoal goal, ReflectionEntry entry) {
-    return Instance.isEqual(goal, entry.getGoalVersion());
+    return INSTANCE.isEqual(goal, entry.getGoalVersion());
   }
 }

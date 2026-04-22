@@ -430,19 +430,19 @@ public class TestReflectionStatusService {
     when(catalog.getTable(targetDatasetId)).thenReturn(targetTable);
 
     // mock external reflection
-    ReflectionId reflectionId = new ReflectionId(UUID.randomUUID().toString());
+    ReflectionId localReflectionId = new ReflectionId(UUID.randomUUID().toString());
     ExternalReflection externalReflection = new ExternalReflection();
-    externalReflection.setId(reflectionId.getId());
+    externalReflection.setId(localReflectionId.getId());
     externalReflection.setQueryDatasetId(queryDatasetId);
     externalReflection.setQueryDatasetHash(queryHash);
     externalReflection.setTargetDatasetId(targetDatasetId);
     // make the hashes not match
     externalReflection.setTargetDatasetHash(targetHash + 1);
 
-    when(externalReflectionStore.get(reflectionId.getId())).thenReturn(externalReflection);
+    when(externalReflectionStore.get(localReflectionId.getId())).thenReturn(externalReflection);
     // since the hashes don't match, should return OUT_OF_SYNC
     ExternalReflectionStatus externalReflectionStatus =
-        reflectionStatusService.getExternalReflectionStatus(reflectionId);
+        reflectionStatusService.getExternalReflectionStatus(localReflectionId);
     assertEquals(
         externalReflectionStatus.getConfigStatus(), ExternalReflectionStatus.STATUS.OUT_OF_SYNC);
   }

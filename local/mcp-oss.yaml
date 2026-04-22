@@ -1,0 +1,4 @@
+dremio:
+    uri: http://localhost:9047
+tools:
+    server_mode: FOR_DATA_PATTERNS

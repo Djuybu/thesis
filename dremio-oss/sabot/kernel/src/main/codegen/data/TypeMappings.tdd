@@ -1,0 +1,48 @@
+#
+# Copyright (C) 2017-2019 Dremio Corporation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+# Maps Arrow MinorTypes to Dremio MinorTypes
+# by default types are supported and the name is the same
+{
+  "TimeStampNano":    { supported: false },
+  "TimeStampMicro":   { supported: false },
+  "TimeStampSec":     { supported: false },
+  "TimeStampMilli":   { minor_type: "TIMESTAMP" },
+  "TimeStampNanoTZ":  { supported: false },
+  "TimeStampMicroTZ": { supported: false },
+  "TimeStampSecTZ":   { supported: false },
+  "TimeStampMilliTZ": { supported: false },
+  "DateDay":          { supported: false },
+  "DateMilli":        { minor_type: "DATE" },
+  "TimeSec":          { supported: false },
+  "TimeMicro":        { supported: false },
+  "TimeNano":         { supported: false },
+  "TimeMilli":        { minor_type: "TIME" },
+  "Duration":         { supported: false },
+  "LargeVarChar":     { supported: false },
+  "LargeVarBinary":   { supported: false },
+  "LargeVarList":     { supported: false },
+  "Decimal256":       { supported: false },
+  # Consider supporting half float. https://github.com/apache/arrow/pull/15169
+  "Float2":           { supported: false },
+  # Consider supporting View types. https://github.com/apache/arrow/issues/40339
+  "BinaryView":       { supported: false },
+  "Utf8View":         { supported: false },
+  "ListView":         { supported: false },
+  "ViewVarChar":      { supported: false },
+  "ViewVarBinary":    { supported: false },
+}
+

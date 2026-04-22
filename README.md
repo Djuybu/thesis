@@ -130,3 +130,6 @@ If you want to contribute to Dremio, please see [Contributing to Dremio](CONTRIB
 ## Questions?
 
 If you have questions, please post them on https://community.dremio.com.
+
+## Run in our project
+uv run dremio-mcp-server run -c local/mcp-oss.yaml --enable-streaming-http --host 127.0.0.1 --port 8080
