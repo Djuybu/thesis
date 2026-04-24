@@ -38,3 +38,7 @@ jetbrains_config.js
 CTestTestfile.cmake
 .python-version
 .gitnexus
+
+# Vendored dremio-mcp under tools/ — do not commit local venvs inside it
+tools/dremio-mcp/.venv-gateway/
+tools/dremio-mcp/.venv/
