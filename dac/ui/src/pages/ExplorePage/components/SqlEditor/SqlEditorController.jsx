@@ -55,6 +55,7 @@ import { selectTab } from "dremio-ui-common/sonar/SqlRunnerSession/resources/Sql
 import { isScriptUrl, isTabbableUrl } from "#oss/utils/explorePageTypeUtils";
 import { withColorScheme } from "dremio-ui-common/utilities/themeUtils.js";
 const toolbarHeight = 41;
+const AICHAT_SQL_DRAFT_KEY = "aichatbot-plugin-sql-draft";
 
 export class SqlEditorController extends PureComponent {
   static propTypes = {
@@ -163,6 +164,12 @@ export class SqlEditorController extends PureComponent {
     if (isNewQueryClick) {
       //TODO: is there a cleaner way?
       this.setState({ datasetsPanel: true });
+      const sqlDraft = localStorage.getItem(AICHAT_SQL_DRAFT_KEY);
+      if (typeof sqlDraft === "string" && sqlDraft.trim()) {
+        this.props.setCurrentSql({ sql: sqlDraft });
+        setEditorContents({ content: sqlDraft });
+        localStorage.removeItem(AICHAT_SQL_DRAFT_KEY);
+      }
     }
 
     const controller = this.getMonacoEditor();
