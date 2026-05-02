@@ -18,6 +18,7 @@ Plugin chạy **tách biệt** khỏi DAC/OSS core: xác thực bằng token Dre
 10. [Xử lý sự cố](#xử-lý-sự-cố)
 11. [English summary](#english-summary)
 12. [**Triển khai đầy đủ (OSS + MCP + LangChain)**](DEPLOYMENT.md)
+13. [**Gateway LangChain — chi tiết (RAG PDF, memory theo user, multi-route, …)**](langchain-gateway/README.md)
 
 ---
 
@@ -88,13 +89,26 @@ dremio-mcp
 | `/aichat/ask` | Chat với **local LLM** (Ollama/LM Studio) qua OpenAI-compatible API. |
 | `/aichat/mcp-proxy` | Gọi **dremio-mcp** (HTTP) để dùng MCP tools với cùng token Dremio đã kiểm tra. |
 
-### Gateway LangChain (một endpoint: LLM + MCP)
+### Gateway LangChain (LLM + MCP + mở rộng LangChain)
 
-Thư mục **`langchain-gateway/`**: FastAPI + LangGraph `create_react_agent` + **Ollama** (mặc định **`qwen2.5:3b`**) + MCP qua **`/aichat/mcp-proxy`** với cùng Bearer token Dremio. Khác [CLI LangChain trong dremio-mcp](https://github.com/dremio/dremio-mcp/blob/main/src/dremioai/servers/frameworks/langchain/server.py) (stdio), gateway OSS dùng **streamable HTTP** qua plugin.
+Thư mục **`langchain-gateway/`**: FastAPI + LangGraph **`create_react_agent`** + **Ollama** + MCP qua **`/aichat/mcp-proxy`** (Bearer token Dremio). Khác [CLI LangChain trong dremio-mcp](https://github.com/dremio/dremio-mcp/blob/main/src/dremioai/servers/frameworks/langchain/server.py) (stdio), gateway OSS dùng **streamable HTTP** qua plugin.
 
-**Hướng dẫn triển khai từng bước (Dremio + MCP + plugin + Ollama + gateway):** xem **[DEPLOYMENT.md](DEPLOYMENT.md)**.
+**Đã bổ sung trong gateway (LangChain / LangGraph):**
 
-Script tiện dụng (chạy từ `langchain-gateway/scripts/`): `setup-venv.ps1`, `pull-qwen-ollama.ps1`, `run-gateway.ps1`, `run-dremio-mcp-http.ps1`. Biến gateway: `OLLAMA_BASE_URL`, `OLLAMA_MODEL`, `AICHAT_MCP_PROXY_URL`, `GATEWAY_HOST`, `GATEWAY_PORT`, `GATEWAY_SYSTEM_PROMPT`, `AICHAT_MCP_TIMEOUT_SECONDS`, `AICHAT_MCP_SSE_READ_TIMEOUT_SECONDS`.
+- **RAG PDF**: chỉ mục file `.pdf` (FAISS + embedding Ollama), tool tìm trong tài liệu — bật bằng `GATEWAY_RAG_DIR`, upload `POST /gateway/rag/upload`.
+- **Memory theo user / session**: `user_id` hoặc `X-User-Id` + `session_id` / `X-Chat-Session-Id`; history Redis tuỳ chọn (`GATEWAY_REDIS_URL`).
+- **Multi-turn**: `RunnableWithMessageHistory`.
+- **Agent gọi API nội bộ**: tool HTTP GET có **allowlist** (`GATEWAY_HTTP_TOOL_ALLOWLIST`).
+- **Multi-tool**: MCP Dremio + (tuỳ chọn) RAG + HTTP.
+- **Multi-route agents** (giám sát ý định): `GATEWAY_MULTI_AGENT` hoặc `"multi_agent": true` — phân luồng bộ tool RAG vs Dremio vs kết hợp.
+- **Context-aware**: trường `user_context` trong body chat ghép vào system prompt.
+- **Persistent memory**: Redis cho hội thoại; chỉ mục RAG trên đĩa dưới `GATEWAY_RAG_DIR`.
+
+**Hướng dẫn đầy đủ (API, biến môi trường, kiến trúc module):** **[langchain-gateway/README.md](langchain-gateway/README.md)**.
+
+**Triển khai từng bước (OSS + MCP + plugin + Ollama + gateway):** **[DEPLOYMENT.md](DEPLOYMENT.md)**.
+
+Script (trong `langchain-gateway/scripts/`): `setup-venv.ps1`, `pull-qwen-ollama.ps1`, `run-gateway.ps1`, `run-dremio-mcp-http.ps1`.
 
 ---
 
@@ -114,7 +128,7 @@ Script tiện dụng (chạy từ `langchain-gateway/scripts/`): `setup-venv.ps1
 | Timeout LLM | `AI_REQUEST_TIMEOUT_SECONDS` (mặc định 120) — model local thường chậm hơn cloud. |
 | Trả lời gọn | `AI_UNWRAP_OPENAI_CONTENT=true` (mặc định): trả JSON có `answer` + `llmRaw` (chuỗi JSON LLM đã escape). |
 | **Proxy tới [dremio-mcp](https://github.com/dremio/dremio-mcp)** | `GET`/`POST` `/aichat/mcp-proxy` sau khi auth Dremio; cần `DREMIO_MCP_HTTP_BASE`. |
-| **Gateway LangChain** (thư mục `langchain-gateway`) | `POST /gateway/chat` — Ollama + MCP tools qua `mcp-proxy`; token Dremio trên header `Authorization`. |
+| **Gateway LangChain** (thư mục `langchain-gateway`) | `POST /gateway/chat` — Ollama + MCP qua `mcp-proxy`; tuỳ chọn **RAG PDF**, memory Redis, **user_id**, **user_context**, HTTP tool allowlist, **multi-route** (`GATEWAY_MULTI_AGENT`). Chi tiết: [langchain-gateway/README.md](langchain-gateway/README.md). |
 
 ---
 
