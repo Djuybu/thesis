@@ -182,9 +182,12 @@ $env:GATEWAY_PORT="9292"
 .\run-gateway.ps1
 ```
 
-**Các biến tuỳ chọn khác** (xem [README.md — Gateway](README.md)):
+**Các biến tuỳ chọn khác** (xem [README plugin](README.md) mục Gateway LangChain và **[langchain-gateway/README.md](langchain-gateway/README.md)**):
 
-- `OLLAMA_BASE_URL`, `GATEWAY_SYSTEM_PROMPT`, `AICHAT_MCP_TIMEOUT_SECONDS`, `AICHAT_MCP_SSE_READ_TIMEOUT_SECONDS`.
+- Cơ bản: `OLLAMA_BASE_URL`, `GATEWAY_SYSTEM_PROMPT`, `AICHAT_MCP_TIMEOUT_SECONDS`, `AICHAT_MCP_SSE_READ_TIMEOUT_SECONDS`.
+- **RAG PDF:** `GATEWAY_RAG_DIR`, `GATEWAY_EMBED_MODEL` (cần `ollama pull` model embedding, ví dụ `nomic-embed-text`); upload qua `POST /gateway/rag/upload`.
+- **Lịch sử bền:** `GATEWAY_REDIS_URL`.
+- **Multi-route / HTTP tool:** `GATEWAY_MULTI_AGENT`, `GATEWAY_HTTP_TOOL_ALLOWLIST`.
 
 **Kiểm tra:** `http://127.0.0.1:9292/health`
 
