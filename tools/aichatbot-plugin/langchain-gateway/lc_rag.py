@@ -110,7 +110,8 @@ class RagIndexManager:
 
         @tool
         async def search_uploaded_documents(query: str) -> str:
-            """Search indexed PDF documents for this chat tenant. Use for questions about uploaded PDFs and their content."""
+            """Search indexed PDF documents for this chat tenant. Use for questions about uploaded PDFs.
+            Base factual claims about document content only on passages returned here; if nothing matches, say so."""
             q = query.strip()
             if not q:
                 return "Empty query."

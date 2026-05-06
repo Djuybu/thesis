@@ -99,8 +99,7 @@ public final class AiChatBotPluginServer {
     final HttpClient httpClient =
         HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(15)).build();
     final HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
-    final ChatHistoryStore historyStore =
-        new ChatHistoryStore(MAX_HISTORY_MESSAGES_PER_SESSION);
+    final ChatHistoryStore historyStore = new ChatHistoryStore(MAX_HISTORY_MESSAGES_PER_SESSION);
 
     final LlmConfig llmConfig =
         new LlmConfig(
@@ -571,7 +570,8 @@ public final class AiChatBotPluginServer {
   /**
    * In-memory chat history APIs.
    *
-   * <p>- POST /aichat/history body: {"sessionId":"...","role":"user|assistant|system","message":"..."}
+   * <p>- POST /aichat/history body:
+   * {"sessionId":"...","role":"user|assistant|system","message":"..."}
    *
    * <p>- GET /aichat/history?sessionId=...&limit=50
    *

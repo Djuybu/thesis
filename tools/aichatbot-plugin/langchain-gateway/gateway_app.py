@@ -9,9 +9,10 @@ from __future__ import annotations
 
 import os
 import tempfile
+import uuid
 from datetime import timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,6 +20,7 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langgraph.prebuilt import create_react_agent
+from langgraph.types import Command
 from pydantic import BaseModel, Field
 
 from lc_agents import (
@@ -29,7 +31,14 @@ from lc_agents import (
     pick_tools_for_intent,
 )
 from lc_config import env, normalize_auth_header
+from lc_grounding import (
+    append_data_query_workflow,
+    append_strict_grounding,
+    data_query_workflow_env_default,
+    strict_grounding_env_default,
+)
 from lc_history import get_history_store, resolve_tenant
+from lc_hitl_sql import build_sql_hitl_graph, interrupts_to_serializable
 from lc_http_tools import build_http_get_tools
 from lc_rag import default_rag_manager
 
@@ -52,7 +61,8 @@ def _message_text(msg: BaseMessage) -> str:
 
 DEFAULT_SYSTEM = (
     "You are an assistant for Dremio lakehouse users. "
-    "Use the available MCP tools to inspect catalog metadata or run SQL when needed. "
+    "Use the available MCP tools to inspect catalog metadata or run SQL when needed; "
+    "discover table and column names from tools before writing SQL—do not invent identifiers. "
     "If search_uploaded_documents is available, use it for questions about PDFs the user uploaded. "
     "Explain briefly what you did and prefer concise answers."
 )
@@ -88,6 +98,57 @@ class ChatRequest(BaseModel):
         le=2,
         description="Optional sampling temperature for the chat model.",
     )
+    strict_grounding: bool | None = Field(
+        default=None,
+        description="If true, append strict anti-hallucination rules to the system prompt and default "
+        "temperature to 0 when temperature is omitted. If null, use GATEWAY_STRICT_GROUNDING env (default on).",
+    )
+    data_query_workflow: bool | None = Field(
+        default=None,
+        description="If true, append discover → schema → confirm → SQL workflow for Dremio data questions. "
+        "If null, use GATEWAY_DATA_QUERY_WORKFLOW env (default on).",
+    )
+
+
+class HitlSqlStartRequest(BaseModel):
+    message: str = Field(..., min_length=1)
+    session_id: str | None = None
+    user_id: str | None = None
+    user_context: str | None = None
+    model: str | None = None
+    thread_id: str | None = Field(
+        default=None,
+        description="Stable id for resume; generated if omitted.",
+    )
+
+
+class HitlSqlStartResponse(BaseModel):
+    status: Literal["interrupted", "completed", "error"]
+    thread_id: str
+    model: str
+    interrupt: list[dict[str, Any]] | None = None
+    answer: str | None = None
+    execution_result: Any | None = None
+    error: str | None = None
+
+
+class HitlSqlResumeRequest(BaseModel):
+    thread_id: str = Field(..., min_length=1)
+    approved: bool
+    sql_override: str | None = Field(
+        default=None,
+        description="If set and approved, run this SQL instead of the proposed statement.",
+    )
+
+
+class HitlSqlResumeResponse(BaseModel):
+    status: Literal["interrupted", "completed", "error"]
+    thread_id: str
+    model: str
+    interrupt: list[dict[str, Any]] | None = None
+    answer: str | None = None
+    execution_result: Any | None = None
+    error: str | None = None
 
 
 class ChatResponse(BaseModel):
@@ -100,6 +161,8 @@ class ChatResponse(BaseModel):
     rag_tenant_id: str = ""
     intent: str | None = None
     multi_agent: bool = False
+    strict_grounding: bool = False
+    data_query_workflow: bool = False
 
 
 def _build_mcp_client(auth_header: str) -> MultiServerMCPClient:
@@ -138,6 +201,142 @@ async def health() -> dict[str, str]:
     return {"status": "ok", "service": "aichat-langchain-gateway"}
 
 
+def _hitl_resume_payload(approved: bool, sql_override: str | None) -> Any:
+    if approved and sql_override and sql_override.strip():
+        return {"approved": True, "sql": sql_override.strip()}
+    if approved:
+        return {"approved": True}
+    return {"approved": False}
+
+
+def _hitl_result_to_start_response(
+    result: dict[str, Any],
+    thread_id: str,
+    model_name: str,
+) -> HitlSqlStartResponse:
+    if result.get("__interrupt__"):
+        return HitlSqlStartResponse(
+            status="interrupted",
+            thread_id=thread_id,
+            model=model_name,
+            interrupt=interrupts_to_serializable(result),
+        )
+    err = result.get("error")
+    ans = result.get("assistant_answer")
+    if err and not ans:
+        return HitlSqlStartResponse(
+            status="error",
+            thread_id=thread_id,
+            model=model_name,
+            error=str(err),
+        )
+    return HitlSqlStartResponse(
+        status="completed",
+        thread_id=thread_id,
+        model=model_name,
+        answer=ans,
+        execution_result=result.get("execution_raw"),
+        error=str(err) if err else None,
+    )
+
+
+def _hitl_result_to_resume_response(
+    result: dict[str, Any],
+    thread_id: str,
+    model_name: str,
+) -> HitlSqlResumeResponse:
+    if result.get("__interrupt__"):
+        return HitlSqlResumeResponse(
+            status="interrupted",
+            thread_id=thread_id,
+            model=model_name,
+            interrupt=interrupts_to_serializable(result),
+        )
+    err = result.get("error")
+    ans = result.get("assistant_answer")
+    if err and not ans:
+        return HitlSqlResumeResponse(
+            status="error",
+            thread_id=thread_id,
+            model=model_name,
+            error=str(err),
+        )
+    return HitlSqlResumeResponse(
+        status="completed",
+        thread_id=thread_id,
+        model=model_name,
+        answer=ans,
+        execution_result=result.get("execution_raw"),
+        error=str(err) if err else None,
+    )
+
+
+@app.post("/gateway/hitl/sql/start", response_model=HitlSqlStartResponse)
+async def hitl_sql_start(http_request: Request, body: HitlSqlStartRequest) -> HitlSqlStartResponse:
+    """StateGraph: discover → schema → propose SQL → interrupt for human approval → (resume) execute."""
+    auth = normalize_auth_header(http_request.headers.get("Authorization"))
+    if not auth:
+        raise HTTPException(
+            status_code=401,
+            detail="Missing Authorization header (same Bearer token as Dremio / aichat plugin).",
+        )
+    if not env("GATEWAY_HITL_SQL_ENABLED", "true").strip().lower() in ("1", "true", "yes", "on"):
+        raise HTTPException(status_code=404, detail="HITL SQL workflow is disabled (GATEWAY_HITL_SQL_ENABLED).")
+
+    model_name = body.model or env("OLLAMA_MODEL", "qwen2.5:3b")
+    ollama_base = env("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
+    try:
+        mcp_client = _build_mcp_client(auth)
+        mcp_tools = await mcp_client.get_tools(server_name="dremio")
+    except Exception as e:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Failed to load MCP tools: {e!s}",
+        ) from e
+
+    llm = build_llm(model_name, ollama_base, temperature=0.0)
+    graph = build_sql_hitl_graph(llm, mcp_tools)
+    thread_id = body.thread_id.strip() if body.thread_id and body.thread_id.strip() else f"hitl-sql-{uuid.uuid4()}"
+    config: dict[str, Any] = {"configurable": {"thread_id": thread_id}, "recursion_limit": 80}
+    initial: dict[str, Any] = {
+        "user_question": body.message.strip(),
+        "user_context": body.user_context,
+    }
+    try:
+        result = await graph.ainvoke(initial, config=config)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"HITL graph failed: {e!s}") from e
+    return _hitl_result_to_start_response(result, thread_id, model_name)
+
+
+@app.post("/gateway/hitl/sql/resume", response_model=HitlSqlResumeResponse)
+async def hitl_sql_resume(http_request: Request, body: HitlSqlResumeRequest) -> HitlSqlResumeResponse:
+    auth = normalize_auth_header(http_request.headers.get("Authorization"))
+    if not auth:
+        raise HTTPException(status_code=401, detail="Missing Authorization header.")
+    if not env("GATEWAY_HITL_SQL_ENABLED", "true").strip().lower() in ("1", "true", "yes", "on"):
+        raise HTTPException(status_code=404, detail="HITL SQL workflow is disabled (GATEWAY_HITL_SQL_ENABLED).")
+
+    model_name = env("OLLAMA_MODEL", "qwen2.5:3b")
+    ollama_base = env("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
+    try:
+        mcp_client = _build_mcp_client(auth)
+        mcp_tools = await mcp_client.get_tools(server_name="dremio")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Failed to load MCP tools: {e!s}") from e
+
+    llm = build_llm(model_name, ollama_base, temperature=0.0)
+    graph = build_sql_hitl_graph(llm, mcp_tools)
+    thread_id = body.thread_id.strip()
+    config: dict[str, Any] = {"configurable": {"thread_id": thread_id}, "recursion_limit": 80}
+    resume_val = _hitl_resume_payload(body.approved, body.sql_override)
+    try:
+        result = await graph.ainvoke(Command(resume=resume_val), config=config)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"HITL resume failed: {e!s}") from e
+    return _hitl_result_to_resume_response(result, thread_id, model_name)
+
+
 @app.post("/gateway/chat", response_model=ChatResponse)
 async def gateway_chat(http_request: Request, body: ChatRequest) -> ChatResponse:
     auth = normalize_auth_header(http_request.headers.get("Authorization"))
@@ -171,7 +370,20 @@ async def gateway_chat(http_request: Request, body: ChatRequest) -> ChatResponse
 
     use_multi = multi_agent_enabled(body.multi_agent)
     intent_label: str | None = None
-    llm = build_llm(model_name, ollama_base, temperature=body.temperature)
+    strict = (
+        body.strict_grounding
+        if body.strict_grounding is not None
+        else strict_grounding_env_default()
+    )
+    data_wf = (
+        body.data_query_workflow
+        if body.data_query_workflow is not None
+        else data_query_workflow_env_default()
+    )
+    eff_temperature = body.temperature
+    if strict and eff_temperature is None:
+        eff_temperature = 0.0
+    llm = build_llm(model_name, ollama_base, temperature=eff_temperature)
 
     if use_multi and rag_mgr and has_rag and rag_tool is not None:
         intent = await classify_intent(llm, ollama_base, body.message.strip(), True)
@@ -183,9 +395,15 @@ async def gateway_chat(http_request: Request, body: ChatRequest) -> ChatResponse
             tools.append(rag_tool)
         tools.extend(http_tools)
 
-    system_prompt = compose_system_prompt(
-        env("GATEWAY_SYSTEM_PROMPT", DEFAULT_SYSTEM),
-        body.user_context,
+    system_prompt = append_data_query_workflow(
+        append_strict_grounding(
+            compose_system_prompt(
+                env("GATEWAY_SYSTEM_PROMPT", DEFAULT_SYSTEM),
+                body.user_context,
+            ),
+            strict,
+        ),
+        data_wf,
     )
     agent = create_react_agent(llm, tools, prompt=system_prompt)
     agent_with_history = RunnableWithMessageHistory(
@@ -229,6 +447,8 @@ async def gateway_chat(http_request: Request, body: ChatRequest) -> ChatResponse
         rag_tenant_id=tenant.rag_tenant_id,
         intent=intent_label,
         multi_agent=use_multi and bool(rag_mgr and has_rag),
+        strict_grounding=strict,
+        data_query_workflow=data_wf,
     )
 
 

@@ -18,7 +18,9 @@ Plugin chạy **tách biệt** khỏi DAC/OSS core: xác thực bằng token Dre
 10. [Xử lý sự cố](#xử-lý-sự-cố)
 11. [English summary](#english-summary)
 12. [**Triển khai đầy đủ (OSS + MCP + LangChain)**](DEPLOYMENT.md)
-13. [**Gateway LangChain — chi tiết (RAG PDF, memory theo user, multi-route, …)**](langchain-gateway/README.md)
+13. [**Triển khai chỉ chatbot** (plugin + Ollama, tuỳ chọn gateway)](CHATBOT-DEPLOY.md)
+14. [**Gateway LangChain — chi tiết (RAG PDF, memory theo user, multi-route, …)**](langchain-gateway/README.md)
+15. [**Build toàn bộ Dremio OSS + plugin / Python** (tiếng Việt)](../../BUILD-FULL-VI.md)
 
 ---
 
