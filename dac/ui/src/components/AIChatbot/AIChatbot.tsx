@@ -26,7 +26,6 @@ import type { AskResponse, ChatMessage, ChatSession, DataRow } from "./types";
 import * as classes from "./AIChatbot.module.less";
 
 const SQL_DRAFT_KEY = "aichatbot-plugin-sql-draft";
-const METRICS_KEY = "aichatbot-plugin-ui-metrics";
 const MAX_PROMPT_LENGTH = 2000;
 const SOFT_PROMPT_LIMIT = 1600;
 const QUICK_PROMPTS = [
@@ -34,41 +33,6 @@ const QUICK_PROMPTS = [
   "Viết câu SQL để đếm số bản ghi theo ngày.",
   "Giải thích lỗi SQL và đề xuất cách sửa.",
 ];
-
-type MetricName =
-  | "messagesSent"
-  | "manualRetries"
-  | "quickActionsUsed"
-  | "sessionsCompleted";
-
-type MetricsSnapshot = Record<MetricName, number>;
-
-const EMPTY_METRICS: MetricsSnapshot = {
-  messagesSent: 0,
-  manualRetries: 0,
-  quickActionsUsed: 0,
-  sessionsCompleted: 0,
-};
-
-const loadMetrics = (): MetricsSnapshot => {
-  try {
-    const raw = localStorage.getItem(METRICS_KEY);
-    if (!raw) return EMPTY_METRICS;
-    const parsed = JSON.parse(raw) as Partial<MetricsSnapshot>;
-    return {
-      messagesSent: Number(parsed.messagesSent || 0),
-      manualRetries: Number(parsed.manualRetries || 0),
-      quickActionsUsed: Number(parsed.quickActionsUsed || 0),
-      sessionsCompleted: Number(parsed.sessionsCompleted || 0),
-    };
-  } catch {
-    return EMPTY_METRICS;
-  }
-};
-
-const saveMetrics = (metrics: MetricsSnapshot) => {
-  localStorage.setItem(METRICS_KEY, JSON.stringify(metrics));
-};
 
 const pickAnswerText = (payload: AskResponse) => {
   const candidates = [payload.response, payload.answer, payload.content];
@@ -88,11 +52,6 @@ export const AIChatbot = () => {
   const [toast, setToast] = useState("");
   const [historyFilter, setHistoryFilter] = useState("");
   const [lastPrompt, setLastPrompt] = useState("");
-  const [lastLatencyMs, setLastLatencyMs] = useState<number | null>(null);
-  const [metrics, setMetrics] = useState<MetricsSnapshot>(loadMetrics);
-  const [connectionStatus, setConnectionStatus] = useState<
-    "idle" | "loading" | "ok" | "error"
-  >("idle");
   const [codeWrap, setCodeWrap] = useState(false);
   const [sessions, setSessions] = useState<ChatSession[]>(() => {
     const existing = chatService.loadSessions();
@@ -105,14 +64,6 @@ export const AIChatbot = () => {
   const messagesRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const requestControllerRef = useRef<AbortController | null>(null);
-
-  const trackMetric = (name: MetricName) => {
-    setMetrics((current) => {
-      const next = { ...current, [name]: current[name] + 1 };
-      saveMetrics(next);
-      return next;
-    });
-  };
 
   const activeSession = useMemo(
     () =>
@@ -139,19 +90,17 @@ export const AIChatbot = () => {
     inputEl.style.height = `${Math.min(inputEl.scrollHeight, 180)}px`;
   }, [input]);
 
-  const persistSessions = (nextSessions: ChatSession[]) => {
-    setSessions(nextSessions);
-    chatService.saveSessions(nextSessions);
-  };
-
   const updateSession = (
     sessionId: string,
     updater: (session: ChatSession) => ChatSession,
   ) => {
-    const nextSessions = sessions.map((session) =>
-      session.id === sessionId ? updater(session) : session,
-    );
-    persistSessions(nextSessions);
+    setSessions((prev) => {
+      const next = prev.map((session) =>
+        session.id === sessionId ? updater(session) : session,
+      );
+      chatService.saveSessions(next);
+      return next;
+    });
   };
 
   const appendMessage = (sessionId: string, message: ChatMessage) => {
@@ -184,8 +133,11 @@ export const AIChatbot = () => {
 
   const onCreateSession = () => {
     const session = createSession();
-    const nextSessions = [session, ...sessions];
-    persistSessions(nextSessions);
+    setSessions((prev) => {
+      const next = [session, ...prev];
+      chatService.saveSessions(next);
+      return next;
+    });
     setActiveSessionId(session.id);
     setIsOpen(true);
   };
@@ -206,7 +158,6 @@ export const AIChatbot = () => {
     try {
       await navigator.clipboard.writeText(message.raw);
       setToast("Đã copy nội dung.");
-      trackMetric("quickActionsUsed");
     } catch {
       setToast("Không copy được nội dung.");
     }
@@ -227,10 +178,7 @@ export const AIChatbot = () => {
     }
 
     setError("");
-    setConnectionStatus("loading");
     setLastPrompt(value);
-    trackMetric("messagesSent");
-    const startedAt = Date.now();
     const requestController = new AbortController();
     requestControllerRef.current = requestController;
     const userMessage: ChatMessage = {
@@ -263,13 +211,11 @@ export const AIChatbot = () => {
         createdAt: Date.now(),
       };
       appendMessage(activeSession.id, aiMessage);
-      setConnectionStatus("ok");
     } catch (e) {
       const isAbort =
         e instanceof DOMException && e.name.toLowerCase() === "aborterror";
       if (isAbort) {
         setError("Đã dừng tạo phản hồi.");
-        setConnectionStatus("idle");
         return;
       }
       const msg = e instanceof Error ? e.message : "Không rõ lỗi";
@@ -281,14 +227,9 @@ export const AIChatbot = () => {
         parsed: parseMessageContent(`Lỗi khi gọi AI backend: ${msg}`),
         createdAt: Date.now(),
       });
-      setConnectionStatus("error");
     } finally {
       requestControllerRef.current = null;
-      setLastLatencyMs(Date.now() - startedAt);
       setIsTyping(false);
-      if (activeSession.messages.length > 2) {
-        trackMetric("sessionsCompleted");
-      }
     }
   };
 
@@ -327,33 +268,8 @@ export const AIChatbot = () => {
           >
             <div className={classes.chat}>
               <header className={classes.header}>
-                <div>
-                  <div className={classes.headerTitle}>AI Chatbot</div>
-                  <div className={classes.metaRow}>
-                    <span className={classes.badge}>Model: default</span>
-                    <span className={classes.badge}>
-                      Phiên: {activeSession.title}
-                    </span>
-                    <span className={classes.badge}>
-                      Latency: {lastLatencyMs ? `${lastLatencyMs}ms` : "N/A"}
-                    </span>
-                    <span className={classes.badge}>Token: N/A</span>
-                    <span className={classes.badge}>
-                      Kết nối API: {connectionStatus}
-                    </span>
-                  </div>
-                </div>
+                <div className={classes.headerTitle}>AI Chatbot</div>
                 <div className={classes.headerActions}>
-                  <button
-                    className={classes.btn}
-                    onClick={() => {
-                      trackMetric("manualRetries");
-                      void askAI(lastPrompt);
-                    }}
-                    disabled={isTyping || !lastPrompt}
-                  >
-                    Retry
-                  </button>
                   {isTyping && (
                     <button className={classes.btn} onClick={stopGenerating}>
                       Dừng tạo phản hồi
@@ -429,7 +345,6 @@ export const AIChatbot = () => {
                             try {
                               await navigator.clipboard.writeText(sql);
                               setToast("Đã copy SQL block.");
-                              trackMetric("quickActionsUsed");
                             } catch {
                               setToast("Không copy được SQL block.");
                             }
@@ -479,7 +394,15 @@ export const AIChatbot = () => {
                           <button
                             className={classes.linkBtn}
                             onClick={() => {
-                              trackMetric("manualRetries");
+                              void askAI(lastPrompt);
+                            }}
+                            disabled={isTyping || !lastPrompt}
+                          >
+                            Retry
+                          </button>
+                          <button
+                            className={classes.linkBtn}
+                            onClick={() => {
                               void askAI(lastPrompt);
                             }}
                             disabled={isTyping || !lastPrompt}
@@ -493,7 +416,6 @@ export const AIChatbot = () => {
                                 classes.linkBtnActive,
                             )}
                             onClick={() => {
-                              trackMetric("quickActionsUsed");
                               setMessageFeedback(
                                 activeSession.id,
                                 message.id,
@@ -510,7 +432,6 @@ export const AIChatbot = () => {
                                 classes.linkBtnActive,
                             )}
                             onClick={() => {
-                              trackMetric("quickActionsUsed");
                               setMessageFeedback(
                                 activeSession.id,
                                 message.id,
@@ -526,7 +447,6 @@ export const AIChatbot = () => {
                         <button
                           className={classes.linkBtn}
                           onClick={() => {
-                            trackMetric("quickActionsUsed");
                             setInput(message.raw);
                           }}
                         >
@@ -591,11 +511,24 @@ export const AIChatbot = () => {
                   </div>
                 </div>
                 <button
-                  className={clsx(classes.btn, classes.primaryBtn)}
+                  type="button"
+                  className={clsx(classes.btn, classes.sendIconBtn)}
+                  aria-label="Gửi"
+                  title="Gửi"
                   onClick={() => void askAI()}
                   disabled={isTyping || !input.trim()}
                 >
-                  Send
+                  <svg
+                    className={classes.sendIcon}
+                    viewBox="0 0 24 24"
+                    aria-hidden
+                    focusable="false"
+                  >
+                    <path
+                      fill="currentColor"
+                      d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.59 5.58L20 12l-8-8-8 8z"
+                    />
+                  </svg>
                 </button>
               </footer>
             </div>
@@ -693,13 +626,6 @@ export const AIChatbot = () => {
                   </div>
                 </button>
               ))}
-              <div className={classes.metricsBox}>
-                <strong>UX metrics</strong>
-                <div>messagesSent: {metrics.messagesSent}</div>
-                <div>manualRetries: {metrics.manualRetries}</div>
-                <div>quickActionsUsed: {metrics.quickActionsUsed}</div>
-                <div>sessionsCompleted: {metrics.sessionsCompleted}</div>
-              </div>
             </aside>
           </section>
         </div>
