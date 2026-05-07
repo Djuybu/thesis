@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from typing import Any, Literal
 
@@ -24,13 +25,24 @@ def build_llm(model_name: str, ollama_base: str, temperature: float | None = Non
 
 def compose_system_prompt(base: str, user_context: str | None) -> str:
     base = base.strip()
-    if user_context and user_context.strip():
-        return (
-            base
-            + "\n\nUser/context (from client — may include profile or task hints):\n"
-            + user_context.strip()
-        )
-    return base
+    if not (user_context and user_context.strip()):
+        return base
+    uc = user_context.strip()
+    block = "\n\nUser/context (from client — may include profile or task hints):\n" + uc
+    # When the client pins a table (structured JSON), add one general workflow hint — not tied to question wording.
+    try:
+        obj = json.loads(uc)
+        if isinstance(obj, dict):
+            fqn = obj.get("table_fqn")
+            if isinstance(fqn, str) and fqn.strip():
+                block += (
+                    "\n\n(Client pinned table) For substantive questions about this dataset, call GetSchemaOfTable "
+                    f"on `{fqn.strip()}` first, then answer narrowly from that schema — only the columns or facts "
+                    "relevant to the user’s question, not the full column list unless they asked for all columns."
+                )
+    except json.JSONDecodeError:
+        pass
+    return base + block
 
 
 Intent = Literal["rag", "dremio", "both"]

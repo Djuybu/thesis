@@ -189,7 +189,8 @@ cd $REPO/tools/aichatbot-plugin/langchain-gateway
 source .venv/bin/activate
 
 export OLLAMA_BASE_URL="http://127.0.0.1:11434"
-export OLLAMA_MODEL="qwen2.5:3b"
+# `ollama pull qwen3.5:9b` trước khi chạy gateway
+export OLLAMA_MODEL="qwen3.5:9b"
 # ⚠ trỏ THẲNG vào dremio-mcp (slash cuối là bắt buộc)
 export AICHAT_MCP_PROXY_URL="http://127.0.0.1:8000/mcp/"
 
@@ -227,7 +228,7 @@ curl -s -X POST http://127.0.0.1:9292/gateway/chat \
   -d '{
     "message":"Có bao nhiêu chuyến trong bảng green_tripdata_2025-01?",
     "session_id":"demo","user_id":"admin",
-    "model":"qwen2.5:3b","temperature":0,
+    "model":"qwen3.5:9b","temperature":0,
     "strict_grounding":false,"data_query_workflow":false,
     "user_context":"{\"table_fqn\":\"\\\"@admin\\\".\\\"green_tripdata_2025-01\\\"\",\"hint\":\"Use RunSqlQuery on <table_fqn>\"}"
   }'

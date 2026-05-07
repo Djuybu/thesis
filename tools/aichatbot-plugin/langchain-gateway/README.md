@@ -42,7 +42,7 @@ pip install -r requirements.txt
 
 ```bash
 export OLLAMA_BASE_URL=http://127.0.0.1:11434
-export OLLAMA_MODEL=qwen2.5:3b
+export OLLAMA_MODEL=qwen3.5:9b
 export AICHAT_MCP_PROXY_URL=http://127.0.0.1:9191/aichat/mcp-proxy?path=/mcp
 # Tuỳ chọn — lịch sử bền:
 # export GATEWAY_REDIS_URL=redis://127.0.0.1:6379/0

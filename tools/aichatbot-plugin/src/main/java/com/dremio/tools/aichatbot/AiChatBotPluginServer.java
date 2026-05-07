@@ -72,7 +72,7 @@ public final class AiChatBotPluginServer {
     final String aiBackendAuthValue =
         Optional.ofNullable(System.getenv("AI_BACKEND_AUTH")).orElse("");
     final String defaultAiModel =
-        Optional.ofNullable(System.getenv("AI_MODEL_DEFAULT")).orElse("llama3.2");
+        Optional.ofNullable(System.getenv("AI_MODEL_DEFAULT")).orElse("qwen3.5:9b");
     final String llmMode = resolveLlmMode(System.getenv("AI_LLM_MODE"), aiBackendUrl);
     final String systemPrompt =
         Optional.ofNullable(System.getenv("AI_SYSTEM_PROMPT"))
