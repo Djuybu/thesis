@@ -4,10 +4,13 @@ import pandas as pd
 import json
 import numpy as np
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel
 from typing import List, Optional
 from sentence_transformers import SentenceTransformer, util
+
+from ingest_models import IngestRequest, IngestResponse
+import ingest_service
 
 # ---- CUSTOM MODEL CLASS ----
 class ReflectionBrain:
@@ -148,11 +151,14 @@ class PredictionResponse(BaseModel):
     details: List[ColumnPredictionDetail]  # Cung cấp chi tiết độ tin cậy để bề mặt UI của Dremio có thể show nếu cần
 
 # ---- ENDPOINTS ----
+INGEST_TOKEN = os.getenv("INGEST_SHARED_SECRET", "")
+
 @app.get("/health")
 async def health_check():
     return {
         "status": "up",
-        "model_loaded": ml_models.get('brain') is not None
+        "model_loaded": ml_models.get('brain') is not None,
+        "last_ingest_batch_id": ml_models.get('_last_ingest_batch_id'),
     }
 
 @app.post("/predict/schema", response_model=PredictionResponse)
@@ -224,3 +230,32 @@ async def predict_schema(req: PredictionRequest):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+def _verify_ingest_token(request: Request) -> None:
+    if not INGEST_TOKEN:
+        return
+    provided = request.headers.get("X-AR-Ingest-Token", "")
+    if provided != INGEST_TOKEN:
+        raise HTTPException(status_code=401, detail="Invalid or missing ingest token")
+
+
+@app.post("/knowledge/ingest", response_model=IngestResponse)
+async def post_knowledge_ingest(body: IngestRequest, request: Request):
+    _verify_ingest_token(request)
+
+    if ingest_service.is_duplicate(body.batchId):
+        return IngestResponse(
+            accepted=True,
+            datasetsProcessed=0,
+            columnsUpdated=0,
+            skippedDuplicate=True,
+        )
+
+    brain = ml_models.get('brain')
+    if brain is None:
+        raise HTTPException(status_code=503, detail="Model not loaded; cannot ingest usage data")
+
+    result = ingest_service.apply_ingest(brain, body)
+    ml_models['_last_ingest_batch_id'] = body.batchId
+    return result

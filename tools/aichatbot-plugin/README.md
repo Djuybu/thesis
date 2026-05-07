@@ -25,17 +25,31 @@ Plugin chạy **tách biệt** khỏi DAC/OSS core: xác thực bằng token Dre
 
 ```text
 Browser / App
-    →  POST /aichat/ask  (Authorization: Bearer <DREMIO_TOKEN>)
+    →  POST /aichat/ask  (Authorization: giống gọi API Dremio — xem mục “Xác thực” bên dưới)
 Plugin
     →  GET  Dremio /apiv2/login        (kiểm tra token)
     →  GET  Dremio /apiv2/user/{user}  (ngữ cảnh user, nếu có username)
     →  POST LLM /v1/chat/completions   (OpenAI-compatible, thường là Ollama/LM Studio local)
 ```
 
+**Xác thực (header `Authorization`):** Plugin chuyển nguyên giá trị header tới `GET /apiv2/login` trên Dremio. **UI OSS** thường gửi token dạng **`_dremio` + token phiên** (cùng convention với `/apiv2/*`). Công cụ như **curl** hoặc PAT có thể dùng **`Bearer <token>`** nếu Dremio của bạn chấp nhận định dạng đó.
+
 - **`AI_LLM_MODE=openai`** (mặc định): plugin tự dựng JSON chuẩn Chat Completions (`messages`, `model`, `stream:false`, …).
 - **`AI_LLM_MODE=custom`**: plugin gửi payload “cầu nối” cũ (`prompt`, `model`, `dremioUserName`, `dremioUserContext`) cho gateway tự viết.
 
 Tuỳ chọn, [Dremio MCP server](https://github.com/dremio/dremio-mcp) chạy HTTP có thể đứng **giữa** client và Dremio cho **MCP tools**; plugin đóng vai **cổng xác thực** + proxy (xem mục [Tích hợp Dremio MCP](#tích-hợp-dremio-mcp)).
+
+### UI Dremio OSS (`dac/ui`) và reverse proxy `/aichat/*`
+
+Khi chạy **Dremio coordinator + UI** trên cùng origin (ví dụ cổng 9047), DAC đăng ký servlet reverse-proxy từ **`/aichat/*`** tới URL base của plugin (mặc định **tắt** nếu chưa cấu hình → **503 JSON** thay vì trả HTML SPA).
+
+Cấu hình (theo thứ tự ưu tiên):
+
+1. Biến môi trường **`DREMIO_AICHATBOT_PLUGIN_BASE_URL`** (ví dụ `http://127.0.0.1:9191`).
+2. JVM **`-Ddremio.aichatbot.plugin.base_url=http://127.0.0.1:9191`**.
+3. **`dremio.conf`**: `services.coordinator.web.aichatbot.plugin.base_url: "http://127.0.0.1:9191"` (mặc định trong `dremio-reference.conf` là chuỗi rỗng = tắt).
+
+**Dev UI webpack (cổng 3005)** không đi qua DAC: đặt `DEV_PROXY_CONFIG_PATH` trỏ tới file mẫu [`dac/ui/build-utils/dev-proxy.aichatbot.example.js`](../../dac/ui/build-utils/dev-proxy.aichatbot.example.js) rồi `npm run start` trong `dac/ui`.
 
 ---
 
@@ -43,12 +57,12 @@ Tuỳ chọn, [Dremio MCP server](https://github.com/dremio/dremio-mcp) chạy H
 
 Repo [dremio/dremio-mcp](https://github.com/dremio/dremio-mcp) triển khai **Model Context Protocol** cho Dremio (khám phá catalog, chạy SQL, v.v.). Plugin `aichatbot` **không** thay thế MCP server; nó bổ sung:
 
-1. **Xác thực giống UI OSS:** kiểm tra `Authorization: Bearer …` với `GET /apiv2/login` trên Dremio OSS của bạn.
+1. **Xác thực giống UI OSS:** kiểm tra header `Authorization` (ví dụ `_dremio…` hoặc `Bearer …`) với `GET /apiv2/login` trên Dremio OSS của bạn.
 2. **Proxy HTTP tới MCP:** sau khi token hợp lệ, forward request tới dremio-mcp đang chạy **streaming HTTP** (cùng header `Authorization` để MCP/OAuth verify như trong tài liệu dremio-mcp).
 
 ```text
 Browser / SPA
-  →  GET|POST /aichat/mcp-proxy?path=/mcp   (Authorization: Bearer <DREMIO_TOKEN>)
+  →  GET|POST /aichat/mcp-proxy?path=/mcp   (Authorization: token Dremio hợp lệ, ví dụ _dremio… hoặc Bearer …)
 Plugin
   →  GET  Dremio /apiv2/login               (chỉ cho phép nếu token OK)
   →  GET|POST {DREMIO_MCP_HTTP_BASE}{path}  (forward body + Accept/Content-Type)
@@ -73,7 +87,7 @@ dremio-mcp
 
    ```bash
    curl -s -X POST "http://localhost:9191/aichat/mcp-proxy?path=/mcp" \
-     -H "Authorization: Bearer <DREMIO_TOKEN>" \
+     -H "Authorization: _dremio<SESSION_TOKEN_OR_USE_BEARER_PAT>" \
      -H "Content-Type: application/json" \
      -H "Accept: application/json, text/event-stream" \
      -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'

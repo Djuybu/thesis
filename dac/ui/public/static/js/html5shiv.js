@@ -18,8 +18,8 @@
     b = c.cache[a]
       ? c.cache[a].cloneNode()
       : r.test(a)
-      ? (c.cache[a] = c.createElem(a)).cloneNode()
-      : c.createElem(a);
+        ? (c.cache[a] = c.createElem(a)).cloneNode()
+        : c.createElem(a);
     return b.canHaveChildren && !s.test(a) ? c.frag.appendChild(b) : b;
   }
   function t(a, b) {
@@ -41,7 +41,7 @@
             b.frag.createElement(a);
             return 'c("' + a + '")';
           }) +
-        ");return n}"
+        ");return n}",
     )(e, b.frag);
   }
   function q(a) {

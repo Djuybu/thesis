@@ -12,7 +12,7 @@ if (-not (Test-Path $py)) {
 
 $env:GATEWAY_HOST = if ($env:GATEWAY_HOST) { $env:GATEWAY_HOST } else { "127.0.0.1" }
 $env:GATEWAY_PORT = if ($env:GATEWAY_PORT) { $env:GATEWAY_PORT } else { "9292" }
-$env:OLLAMA_MODEL = if ($env:OLLAMA_MODEL) { $env:OLLAMA_MODEL } else { "qwen2.5:3b" }
+$env:OLLAMA_MODEL = if ($env:OLLAMA_MODEL) { $env:OLLAMA_MODEL } else { "gemma4:e4b" }
 $env:OLLAMA_BASE_URL = if ($env:OLLAMA_BASE_URL) { $env:OLLAMA_BASE_URL } else { "http://127.0.0.1:11434" }
 $env:AICHAT_MCP_PROXY_URL = if ($env:AICHAT_MCP_PROXY_URL) { $env:AICHAT_MCP_PROXY_URL } else { "http://127.0.0.1:9191/aichat/mcp-proxy?path=/mcp" }
 

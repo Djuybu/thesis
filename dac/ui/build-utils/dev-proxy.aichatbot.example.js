@@ -14,22 +14,26 @@
  * limitations under the License.
  */
 
-import { glob } from "glob";
-import { join, parse } from "path";
-import { output } from "./output";
-import { writeFileSync } from "fs";
-
-const emptySourcemap = (file: string) => `{
-  "version": 1,
-  "mappings": "",
-  "sources": [],
-  "names": [],
-  "file": "${file}"
-}\n`;
-
-const getSourcemapForMapPath = (mapPath: string) =>
-  emptySourcemap(parse(mapPath).base.replace(".map", ""));
-
-for (const sourcemapPath of glob.sync(join(output.path, "**/*.map"))) {
-  writeFileSync(sourcemapPath, getSourcemapForMapPath(sourcemapPath));
-}
+/**
+ * Example webpack-dev-server proxy so the UI (port 3005) can call {@code /aichat/*} while the
+ * standalone aichatbot-plugin runs on port 9191.
+ *
+ * Usage from {@code dac/ui}:
+ *
+ * <pre>
+ *   export DEV_PROXY_CONFIG_PATH=./build-utils/dev-proxy.aichatbot.example.js
+ *   npm run start
+ * </pre>
+ *
+ * Then start the plugin jar with {@code DREMIO_BASE_URL} pointing at your coordinator (e.g.
+ * {@code http://localhost:9047}).
+ */
+module.exports = {
+  proxy: {
+    "/aichat": {
+      target: "http://127.0.0.1:9191",
+      changeOrigin: false,
+      secure: false,
+    },
+  },
+};

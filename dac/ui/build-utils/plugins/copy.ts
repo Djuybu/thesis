@@ -23,14 +23,18 @@ export const copy = new CopyWebpackPlugin({
       from: "public",
     },
     dremioEdition === "ee" &&
-    ({
-      from: join(process.env.DREMIO_DYN_LOADER_PATH!, "../public"),
-    } as any),
+      ({
+        from: join(process.env.DREMIO_DYN_LOADER_PATH!, "../public"),
+      } as any),
     dremioEdition === "DCS" &&
-    ({
-      //@ts-ignore
-      from: join((process.env.DREMIO_DCS_LOADER_PATH || process.env.DREMIO_INJECTION_PATH), "../public"),
-    } as any),
+      ({
+        from: join(
+          process.env.DREMIO_DCS_LOADER_PATH ||
+            process.env.DREMIO_INJECTION_PATH ||
+            "",
+          "../public",
+        ),
+      } as any),
     {
       from: "node_modules/jsplumb/dist/js/jsPlumb-2.1.4-min.js",
       to: "static/js",

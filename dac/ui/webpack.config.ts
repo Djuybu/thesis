@@ -61,7 +61,7 @@ const config = {
 
   // 2. CẤU HÌNH LOGGING
   infrastructureLogging: {
-    level: 'error',
+    level: "error",
   },
 
   output,
@@ -71,9 +71,9 @@ const config = {
     app: [
       path.resolve(
         process.env.DREMIO_DCS_LOADER_PATH ||
-        process.env.DREMIO_INJECTION_PATH ||
-        process.env.DREMIO_DYN_LOADER_PATH ||
-        path.join(__dirname, "src"),
+          process.env.DREMIO_INJECTION_PATH ||
+          process.env.DREMIO_DYN_LOADER_PATH ||
+          path.join(__dirname, "src"),
         "index.tsx",
       ),
     ],
@@ -84,23 +84,24 @@ const config = {
   },
   module: {
     // 3. THÊM LOADER CHO CÁC THƯ MỤC NGOÀI: Sửa lỗi "Unexpected token"
-    rules: getRules({
-      additionalIncludes: [
-        ...(dcsPath ? [dcsPath] : []),
-        path.resolve(__dirname, "../ui-common/src"),
-        path.resolve(__dirname, "../ui-lib/src"),
-        path.resolve(__dirname, "../../ui/icons/src"),
-        path.resolve(__dirname, "../../ui/design-system") // Cần thiết cho các file .ts/.tsx trong design-system
-      ]
-    },
+    rules: getRules(
+      {
+        additionalIncludes: [
+          ...(dcsPath ? [dcsPath] : []),
+          path.resolve(__dirname, "../ui-common/src"),
+          path.resolve(__dirname, "../ui-lib/src"),
+          path.resolve(__dirname, "../../ui/icons/src"),
+          path.resolve(__dirname, "../../ui/design-system"), // Cần thiết cho các file .ts/.tsx trong design-system
+        ],
+      },
       {
         test: /\.svg$/,
-        type: 'asset/resource',
+        type: "asset/resource",
         generator: {
-          filename: 'static/icons/[name][ext]'
-        }
-      }),
-
+          filename: "static/icons/[name][ext]",
+        },
+      },
+    ),
   },
 
   plugins: [
@@ -125,33 +126,49 @@ const config = {
         "#ee": dynLoadPath,
 
         // Explicit mapping to compiled lang JSON files
-        "dremio-ui-common/lang": path.resolve(__dirname, "../ui-common/dist-lang"),
-        "dremio-ui-common/appTheme": path.resolve(__dirname, "../ui-common/src/appTheme/appTheme.ts"),
+        "dremio-ui-common/lang": path.resolve(
+          __dirname,
+          "../ui-common/dist-lang",
+        ),
+        "dremio-ui-common/appTheme": path.resolve(
+          __dirname,
+          "../ui-common/src/appTheme/appTheme.ts",
+        ),
         "dremio-ui-common": path.resolve(__dirname, "../ui-common/src"),
 
         // Explicit mappings for ui-lib so that subpaths don't hit the blanket /src mapping below
-        "dremio-ui-lib/components": path.resolve(__dirname, "../ui-lib/components"),
+        "dremio-ui-lib/components": path.resolve(
+          __dirname,
+          "../ui-lib/components",
+        ),
         "dremio-ui-lib/icons": path.resolve(__dirname, "../ui-lib/icons"),
         "dremio-ui-lib/images": path.resolve(__dirname, "../ui-lib/images"),
-        "dremio-ui-lib/dist-themes": path.resolve(__dirname, "../ui-lib/dist-themes"),
-        "dremio-ui-lib/dist-icons": path.resolve(__dirname, "../ui-lib/dist-icons"),
+        "dremio-ui-lib/dist-themes": path.resolve(
+          __dirname,
+          "../ui-lib/dist-themes",
+        ),
+        "dremio-ui-lib/dist-icons": path.resolve(
+          __dirname,
+          "../ui-lib/dist-icons",
+        ),
         "dremio-ui-lib/dist": path.resolve(__dirname, "../ui-lib/dist"),
         "dremio-ui-lib": path.resolve(__dirname, "../ui-lib/src"),
 
         "~dremio-ui-lib/icons": path.resolve(__dirname, "../ui-lib/icons"),
-        "~dremio-ui-lib/styles": path.resolve(__dirname, "../ui-lib/src/styles"),
+        "~dremio-ui-lib/styles": path.resolve(
+          __dirname,
+          "../ui-lib/src/styles",
+        ),
         "~dremio-ui-lib": path.resolve(__dirname, "../ui-lib/src"),
         "~dremio-ui-common": path.resolve(__dirname, "../ui-common/src"),
-
-
       },
     }),
 
     // 4. EXTENSION ALIAS: Sửa lỗi "Can't resolve .js" khi file thực tế là .ts/.tsx
     extensionAlias: {
       ".js": [".ts", ".tsx", ".js"],
-      ".jsx": [".tsx", ".jsx"]
-    }
+      ".jsx": [".tsx", ".jsx"],
+    },
   },
 };
 

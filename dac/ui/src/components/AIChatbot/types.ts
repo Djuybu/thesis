@@ -13,23 +13,37 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+export type ChatRole = "user" | "assistant";
 
-import { glob } from "glob";
-import { join, parse } from "path";
-import { output } from "./output";
-import { writeFileSync } from "fs";
+export type DataRow = Record<string, unknown>;
 
-const emptySourcemap = (file: string) => `{
-  "version": 1,
-  "mappings": "",
-  "sources": [],
-  "names": [],
-  "file": "${file}"
-}\n`;
+export type ParsedMessage = {
+  html: string;
+  sqlBlocks: string[];
+  tableRows: DataRow[];
+};
 
-const getSourcemapForMapPath = (mapPath: string) =>
-  emptySourcemap(parse(mapPath).base.replace(".map", ""));
+export type ChatMessage = {
+  id: string;
+  role: ChatRole;
+  raw: string;
+  parsed: ParsedMessage;
+  createdAt: number;
+  feedback?: "up" | "down";
+};
 
-for (const sourcemapPath of glob.sync(join(output.path, "**/*.map"))) {
-  writeFileSync(sourcemapPath, getSourcemapForMapPath(sourcemapPath));
-}
+export type ChatSession = {
+  id: string;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+  messages: ChatMessage[];
+  pinned?: boolean;
+};
+
+export type AskResponse = {
+  response?: string;
+  answer?: string;
+  content?: string;
+  data?: DataRow[];
+};

@@ -33,7 +33,10 @@ export DREMIO_MCP_HTTP_PATH="${DREMIO_MCP_HTTP_PATH:-/mcp/}"
 
 # Cấu hình gọi Ollama dùng để hỏi đáp trực tiếp (nếu không qua Langchain thì sẽ dùng cấu hình này)
 export AI_BACKEND_URL="${AI_BACKEND_URL:-http://127.0.0.1:11434/v1/chat/completions}"
-export AI_MODEL_DEFAULT="${AI_MODEL_DEFAULT:-qwen2.5:3b}"
+export AI_MODEL_DEFAULT="${AI_MODEL_DEFAULT:-gemma4:e4b}"
+
+# /aichat/ask defaults to LangChain gateway :9292 (MCP). Start: langchain-gateway/scripts/run-gateway.sh
+# export AICHAT_ASK_USE_LANGCHAIN_GATEWAY=false  # direct Ollama only (no MCP in ask)
 
 echo "============================================================"
 echo "▶ Khởi động AI Chatbot Plugin (Standalone - Java)"
@@ -42,6 +45,7 @@ echo "▶ AICHAT_PORT:          $AICHAT_PORT"
 echo "▶ MCP_PROXY target:     $DREMIO_MCP_HTTP_BASE$DREMIO_MCP_HTTP_PATH"
 echo "▶ AI_BACKEND_URL:       $AI_BACKEND_URL"
 echo "▶ AI_MODEL_DEFAULT:     $AI_MODEL_DEFAULT"
+echo "▶ Ask -> LangChain MCP: AICHAT_ASK_USE_LANGCHAIN_GATEWAY=${AICHAT_ASK_USE_LANGCHAIN_GATEWAY:-true}  AICHAT_LANGCHAIN_GATEWAY_URL=${AICHAT_LANGCHAIN_GATEWAY_URL:-<Java default 127.0.0.1:9292>}"
 echo "▶ File thi hành:        $JAR_FILE"
 echo "============================================================"
 

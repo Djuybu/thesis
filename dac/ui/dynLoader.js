@@ -18,7 +18,7 @@ const path = require("path");
 
 exports.path = path.resolve(
   __dirname,
-  process.env.DREMIO_DYN_LOADER_PATH || "./src"
+  process.env.DREMIO_DYN_LOADER_PATH || "./src",
 );
 
 // make the dyn-load module actually resolve, dynamically for mocha/node
@@ -30,7 +30,7 @@ exports.applyNodeResolver = () => {
     if (module.match(/^dyn-load($|\/)/)) {
       return originalRequire.call(
         this,
-        module.replace(/^dyn-load/, exports.path)
+        module.replace(/^dyn-load/, exports.path),
       );
     }
     return originalRequire.apply(this, arguments);

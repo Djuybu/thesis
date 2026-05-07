@@ -91,7 +91,6 @@ export function formFields(formValue) {
 
 export const stubArrayFieldMethods = (field) =>
   Object.assign(field, {
-     
     removeField: sinon.spy(),
     addField: sinon.spy(),
   });

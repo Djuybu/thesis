@@ -17,6 +17,7 @@ import * as env from "env-var";
 
 const DEV_PROXY_CONFIG_PATH = env.get("DEV_PROXY_CONFIG_PATH").asString();
 
+/** When set, merges webpack `devServer.proxy` (e.g. {@code build-utils/dev-proxy.aichatbot.example.js} for /aichat → plugin). */
 export const devServer = {
   client: {
     overlay: false,

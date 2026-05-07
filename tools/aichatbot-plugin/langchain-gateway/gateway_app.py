@@ -193,7 +193,8 @@ async def gateway_chat(http_request: Request, body: ChatRequest) -> ChatResponse
 
     model_name = body.model or _env("OLLAMA_MODEL", "gemma4:e4b")
     ollama_base = _env("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
-    strict_tool_use = _env_bool("GATEWAY_STRICT_TOOL_USE", True)
+    # Default false: tools are still loaded every request; strict mode rejects answers without tool calls (breaks casual chat).
+    strict_tool_use = _env_bool("GATEWAY_STRICT_TOOL_USE", False)
 
     mcp_url = _env(
         "AICHAT_MCP_PROXY_URL",

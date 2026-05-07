@@ -59,6 +59,7 @@ import com.dremio.service.namespace.NamespaceService;
 import com.dremio.service.namespace.dataset.proto.DatasetConfig;
 import com.dremio.service.namespace.dataset.proto.RefreshMethod;
 import com.dremio.service.reflection.ReflectionService.BaseReflectionService;
+import com.dremio.service.reflection.analysis.AutonomousReflectionIngestTask;
 import com.dremio.service.reflection.analysis.ReflectionAnalyzer;
 import com.dremio.service.reflection.analysis.ReflectionAnalyzer.TableStats;
 import com.dremio.service.reflection.analysis.ReflectionSuggester;
@@ -173,6 +174,7 @@ public class ReflectionServiceImpl extends BaseReflectionService {
   private ReflectionManager reflectionManager = null;
 
   private final Supplier<ReflectionManagerFactory> reflectionManagerFactorySupplier;
+  private final SabotConfig sabotConfig;
 
   public ReflectionServiceImpl(
       final SabotConfig config,
@@ -245,6 +247,7 @@ public class ReflectionServiceImpl extends BaseReflectionService {
     this.reflectionValidatorSupplier =
         Suppliers.memoize(() -> reflectionManagerFactorySupplier.get().newReflectionValidator());
     this.datasetEventHub = datasetEventHub;
+    this.sabotConfig = config;
   }
 
   public MaterializationDescriptorProvider getMaterializationDescriptor() {
@@ -319,7 +322,36 @@ public class ReflectionServiceImpl extends BaseReflectionService {
                       this);
             }
           });
+
+      startAutonomousReflectionIngestTask();
     }
+  }
+
+  private void startAutonomousReflectionIngestTask() {
+    final String enabledKey = "services.autonomous-reflection.ingest.enabled";
+    if (!sabotConfig.hasPath(enabledKey) || !sabotConfig.getBoolean(enabledKey)) {
+      logger.debug(
+          "Autonomous reflection ingest task is disabled (set {} = true to enable)", enabledKey);
+      return;
+    }
+    String ingestUrl = sabotConfig.getString("services.autonomous-reflection.ingest.url");
+    String ingestToken =
+        sabotConfig.hasPath("services.autonomous-reflection.ingest.token")
+            ? sabotConfig.getString("services.autonomous-reflection.ingest.token")
+            : "";
+    long intervalMin =
+        sabotConfig.hasPath("services.autonomous-reflection.ingest.interval_minutes")
+            ? sabotConfig.getLong("services.autonomous-reflection.ingest.interval_minutes")
+            : 5L;
+
+    AutonomousReflectionIngestTask ingestTask =
+        new AutonomousReflectionIngestTask(
+            jobsService, schedulerService, ingestUrl, ingestToken, intervalMin);
+    ingestTask.start();
+    logger.info(
+        "Autonomous reflection ingest task started (url={}, interval={}min)",
+        ingestUrl,
+        intervalMin);
   }
 
   @VisibleForTesting

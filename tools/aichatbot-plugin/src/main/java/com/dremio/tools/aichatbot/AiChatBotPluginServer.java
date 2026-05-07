@@ -30,6 +30,9 @@ import java.net.http.HttpConnectTimeoutException;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.util.Locale;
 import java.util.Optional;
@@ -41,15 +44,15 @@ import java.util.concurrent.ThreadFactory;
  * Standalone AI chat plugin server for Dremio.
  *
  * <p>This service is intentionally separate from DAC backend. It reuses Dremio auth by forwarding
- * Authorization token to Dremio APIs, then calls a local or remote LLM (OpenAI-compatible API is
- * recommended for Ollama, LM Studio, vLLM, etc.).
+ * the {@code Authorization} token to Dremio APIs. By default {@code /aichat/ask} forwards to the
+ * LangChain HTTP gateway ({@code POST /gateway/chat}), which loads MCP tools via {@code
+ * /aichat/mcp-proxy}. Set {@code AICHAT_ASK_USE_LANGCHAIN_GATEWAY=false} to call {@code
+ * AI_BACKEND_URL} directly instead (OpenAI-compatible API for Ollama, LM Studio, vLLM, etc.).
  */
 public final class AiChatBotPluginServer {
   private static final String CONTENT_TYPE = "Content-Type";
   private static final String APPLICATION_JSON = "application/json; charset=utf-8";
   private static final String APPLICATION_JSON_PLAIN = "application/json";
-  private static final String DEBUG_LOG_PATH = "/home/djuybu/dremio-oss/.cursor/debug-4811a9.log";
-  private static final String DEBUG_SESSION_ID = "4811a9";
 
   /** Pass-through JSON to a custom gateway (legacy). */
   private static final String MODE_CUSTOM = "custom";
@@ -89,7 +92,7 @@ public final class AiChatBotPluginServer {
     final String aiBackendAuthValue =
         Optional.ofNullable(System.getenv("AI_BACKEND_AUTH")).orElse("");
     final String defaultAiModel =
-        Optional.ofNullable(System.getenv("AI_MODEL_DEFAULT")).orElse("llama3.2");
+        Optional.ofNullable(System.getenv("AI_MODEL_DEFAULT")).orElse("gemma4:e4b");
     final String llmMode = resolveLlmMode(System.getenv("AI_LLM_MODE"), aiBackendUrl);
     final String systemPrompt =
         Optional.ofNullable(System.getenv("AI_SYSTEM_PROMPT"))
@@ -98,7 +101,7 @@ public final class AiChatBotPluginServer {
                     + "Answer clearly. If user context is provided, personalize briefly (do not dump secrets).");
     final int requestTimeoutSeconds =
         Integer.parseInt(
-            Optional.ofNullable(System.getenv("AI_REQUEST_TIMEOUT_SECONDS")).orElse("120"));
+            Optional.ofNullable(System.getenv("AI_REQUEST_TIMEOUT_SECONDS")).orElse("86400"));
     final boolean unwrapAnswer =
         Boolean.parseBoolean(
             Optional.ofNullable(System.getenv("AI_UNWRAP_OPENAI_CONTENT")).orElse("true"));
@@ -112,6 +115,21 @@ public final class AiChatBotPluginServer {
             Optional.ofNullable(System.getenv("DREMIO_MCP_PROXY_TIMEOUT_SECONDS")).orElse("300"));
     final McpProxyConfig mcpProxyConfig =
         new McpProxyConfig(mcpHttpBase, mcpDefaultPath, mcpProxyTimeoutSeconds);
+    final boolean askUseLangchainGateway =
+        Boolean.parseBoolean(
+            Optional.ofNullable(System.getenv("AICHAT_ASK_USE_LANGCHAIN_GATEWAY")).orElse("true"));
+    final String langchainGatewayBaseUrl =
+        askUseLangchainGateway
+            ? stripTrailingSlash(
+                Optional.ofNullable(System.getenv("AICHAT_LANGCHAIN_GATEWAY_URL"))
+                    .filter(s -> s != null && !s.isBlank())
+                    .orElse("http://127.0.0.1:9292")
+                    .trim())
+            : "";
+    final int langchainGatewayTimeoutSeconds =
+        Integer.parseInt(
+            Optional.ofNullable(System.getenv("AICHAT_LANGCHAIN_GATEWAY_TIMEOUT_SECONDS"))
+                .orElse("86400"));
 
     final HttpClient httpClient =
         HttpClient.newBuilder()
@@ -150,11 +168,21 @@ public final class AiChatBotPluginServer {
     server.createContext("/health", exchange -> handleHealth(exchange));
     server.createContext(
         "/aichat/config",
-        exchange -> handleConfig(exchange, llmConfig, dremioBaseUrl, mcpProxyConfig));
+        exchange ->
+            handleConfig(
+                exchange, llmConfig, dremioBaseUrl, mcpProxyConfig, langchainGatewayBaseUrl));
     server.createContext(
         "/aichat/context", exchange -> handleContext(exchange, httpClient, dremioBaseUrl));
     server.createContext(
-        "/aichat/ask", exchange -> handleAsk(exchange, httpClient, dremioBaseUrl, llmConfig));
+        "/aichat/ask",
+        exchange ->
+            handleAsk(
+                exchange,
+                httpClient,
+                dremioBaseUrl,
+                llmConfig,
+                langchainGatewayBaseUrl,
+                langchainGatewayTimeoutSeconds));
     server.createContext(
         "/aichat/mcp-proxy",
         exchange -> handleMcpProxy(exchange, httpClient, dremioBaseUrl, mcpProxyConfig));
@@ -165,10 +193,18 @@ public final class AiChatBotPluginServer {
     logf("AI Chat plugin server is running at http://localhost:%d%n", port);
     logf("Dremio upstream configured as %s%n", dremioBaseUrl);
     logf("LLM mode: %s (set AI_LLM_MODE=openai|custom)%n", llmMode);
-    if (aiBackendUrl.isBlank()) {
-      log("AI_BACKEND_URL is not set, /aichat/ask returns mock after Dremio auth.");
+    if (!langchainGatewayBaseUrl.isBlank()) {
+      logf(
+          "/aichat/ask -> LangChain gateway (MCP) %s (timeout %ds); set AICHAT_ASK_USE_LANGCHAIN_GATEWAY=false to use direct AI_BACKEND only%n",
+          langchainGatewayBaseUrl, langchainGatewayTimeoutSeconds);
     } else {
-      logf("AI backend URL: %s%n", aiBackendUrl);
+      log(
+          "/aichat/ask uses direct LLM (AICHAT_ASK_USE_LANGCHAIN_GATEWAY=false or gateway URL empty).");
+    }
+    if (aiBackendUrl.isBlank()) {
+      log("AI_BACKEND_URL is not set (direct LLM path disabled unless gateway handles ask).");
+    } else {
+      logf("AI backend URL (direct LLM when gateway unset): %s%n", aiBackendUrl);
     }
     if (mcpHttpBase.isBlank()) {
       log("DREMIO_MCP_HTTP_BASE is not set; /aichat/mcp-proxy is disabled.");
@@ -228,7 +264,11 @@ public final class AiChatBotPluginServer {
   }
 
   private static void handleConfig(
-      HttpExchange exchange, LlmConfig cfg, String dremioBaseUrl, McpProxyConfig mcpProxy)
+      HttpExchange exchange,
+      LlmConfig cfg,
+      String dremioBaseUrl,
+      McpProxyConfig mcpProxy,
+      String langchainGatewayBaseUrl)
       throws IOException {
     addCors(exchange);
     if (handleOptions(exchange)) {
@@ -266,6 +306,9 @@ public final class AiChatBotPluginServer {
             + ","
             + "\"mcpProxyTimeoutSeconds\":"
             + mcpProxy.timeoutSeconds
+            + ","
+            + "\"langchainGatewayConfigured\":"
+            + (!langchainGatewayBaseUrl.isBlank())
             + "}";
     writeJson(exchange, 200, body);
   }
@@ -298,6 +341,21 @@ public final class AiChatBotPluginServer {
       writeJson(exchange, 401, jsonError("Missing Authorization header"));
       return;
     }
+    // #region agent log
+    debugLog(
+        "pre-fix",
+        "H-auth",
+        "AiChatBotPluginServer.java:handleMcpProxy",
+        "mcp_proxy_authorization_shape",
+        "{"
+            + "\"dremioBaseUrl\":\""
+            + escapeJson(dremioBaseUrl)
+            + "\",\"requestPath\":\""
+            + escapeJson(exchange.getRequestURI().getPath())
+            + "\",\"auth\":"
+            + authorizationHeaderShapeJson(token)
+            + "}");
+    // #endregion
     final String rawQuery = exchange.getRequestURI().getRawQuery();
     final String pathParam = parseQueryParameter(rawQuery, "path");
     final String path =
@@ -346,6 +404,23 @@ public final class AiChatBotPluginServer {
       final HttpResponse<String> login = fetchLoginInfo(client, dremioBaseUrl, token);
       if (login.statusCode() >= 400) {
         log("[MCP Proxy] Invalid Dremio token verified via " + dremioBaseUrl);
+        // #region agent log
+        debugLog(
+            "pre-fix",
+            "H-login",
+            "AiChatBotPluginServer.java:handleMcpProxy",
+            "dremio_apiv2_login_rejected",
+            "{"
+                + "\"dremioBaseUrl\":\""
+                + escapeJson(dremioBaseUrl)
+                + "\",\"httpStatus\":"
+                + login.statusCode()
+                + ",\"responseBodyCharCount\":"
+                + login.body().length()
+                + ",\"auth\":"
+                + authorizationHeaderShapeJson(token)
+                + "}");
+        // #endregion
         writeJson(exchange, 401, jsonError("Invalid Dremio token"));
         return;
       }
@@ -600,7 +675,84 @@ public final class AiChatBotPluginServer {
 
   private static void debugLog(
       String runId, String hypothesisId, String location, String message, String dataJson) {
-    // instrumentation disabled after debugging
+    // #region agent log
+    try {
+      final long ts = System.currentTimeMillis();
+      final String line =
+          "{\"sessionId\":\"9551b1\","
+              + "\"runId\":\""
+              + escapeJson(runId)
+              + "\","
+              + "\"hypothesisId\":\""
+              + escapeJson(hypothesisId)
+              + "\","
+              + "\"location\":\""
+              + escapeJson(location)
+              + "\","
+              + "\"message\":\""
+              + escapeJson(message)
+              + "\","
+              + "\"data\":"
+              + dataJson
+              + ","
+              + "\"timestamp\":"
+              + ts
+              + "}\n";
+      Files.writeString(
+          Paths.get("/home/djuybu/thesis/.cursor/debug-9551b1.log"),
+          line,
+          StandardCharsets.UTF_8,
+          StandardOpenOption.CREATE,
+          StandardOpenOption.APPEND);
+    } catch (Exception ignored) {
+      // avoid breaking request path if debug log file is unavailable
+    }
+    // #endregion
+  }
+
+  /**
+   * JSON object (no surrounding quotes) describing {@code Authorization} shape only — never
+   * includes the secret token value.
+   */
+  private static String authorizationHeaderShapeJson(String authorizationHeader) {
+    if (authorizationHeader == null) {
+      return "{\"present\":false}";
+    }
+    final String h = authorizationHeader;
+    final boolean leadingWs = !h.isEmpty() && Character.isWhitespace(h.charAt(0));
+    final boolean trailingWs = !h.isEmpty() && Character.isWhitespace(h.charAt(h.length() - 1));
+    final boolean hasCtl = h.chars().anyMatch(cp -> cp < 0x20 || cp == 0x7f);
+    final boolean startsWithBearer = h.length() >= 7 && h.regionMatches(true, 0, "Bearer ", 0, 7);
+    final String cred = (startsWithBearer ? h.substring(7) : h).trim();
+    final long dotCount = cred.chars().filter(ch -> ch == '.').count();
+    final String[] segs = cred.split("\\.", -1);
+    final int segCount = segs.length;
+    final boolean looksLikeThreePartJwt = segCount >= 3 && !segs[0].isEmpty() && !segs[1].isEmpty();
+    final boolean doubleBearer =
+        startsWithBearer && cred.length() >= 7 && cred.regionMatches(true, 0, "Bearer ", 0, 7);
+    return "{"
+        + "\"present\":true"
+        + ",\"headerCharCount\":"
+        + h.length()
+        + ",\"startsWithBearerSpace\":"
+        + startsWithBearer
+        + ",\"credentialCharCount\":"
+        + cred.length()
+        + ",\"dotCountInCredential\":"
+        + dotCount
+        + ",\"segmentCountByDot\":"
+        + segCount
+        + ",\"looksLikeThreePartJwt\":"
+        + looksLikeThreePartJwt
+        + ",\"doubleBearerInCredential\":"
+        + doubleBearer
+        + ",\"leadingWhitespace\":"
+        + leadingWs
+        + ",\"trailingWhitespace\":"
+        + trailingWs
+        + ",\"controlOrNonPrintable\":"
+        + hasCtl
+        + "}";
   }
 
   private static String parseQueryParameter(String query, String key) {
@@ -708,7 +860,12 @@ public final class AiChatBotPluginServer {
   }
 
   private static void handleAsk(
-      HttpExchange exchange, HttpClient client, String dremioBaseUrl, LlmConfig cfg)
+      HttpExchange exchange,
+      HttpClient client,
+      String dremioBaseUrl,
+      LlmConfig cfg,
+      String langchainGatewayBaseUrl,
+      int langchainGatewayTimeoutSeconds)
       throws IOException {
     addCors(exchange);
     if (handleOptions(exchange)) {
@@ -724,6 +881,19 @@ public final class AiChatBotPluginServer {
       writeJson(exchange, 401, "{\"error\":\"Missing Authorization header\"}");
       return;
     }
+    // #region agent log
+    debugLog(
+        "pre-fix",
+        "H-auth",
+        "AiChatBotPluginServer.java:handleAsk",
+        "ask_authorization_shape",
+        "{"
+            + "\"dremioBaseUrl\":\""
+            + escapeJson(dremioBaseUrl)
+            + "\",\"auth\":"
+            + authorizationHeaderShapeJson(token)
+            + "}");
+    // #endregion
 
     final String body = readRequestBody(exchange.getRequestBody());
     final String prompt = extractPrompt(body);
@@ -742,6 +912,23 @@ public final class AiChatBotPluginServer {
     try {
       final HttpResponse<String> loginCheckResponse = fetchLoginInfo(client, dremioBaseUrl, token);
       if (loginCheckResponse.statusCode() >= 400) {
+        // #region agent log
+        debugLog(
+            "pre-fix",
+            "H-login",
+            "AiChatBotPluginServer.java:handleAsk",
+            "ask_dremio_apiv2_login_rejected",
+            "{"
+                + "\"dremioBaseUrl\":\""
+                + escapeJson(dremioBaseUrl)
+                + "\",\"httpStatus\":"
+                + loginCheckResponse.statusCode()
+                + ",\"responseBodyCharCount\":"
+                + loginCheckResponse.body().length()
+                + ",\"auth\":"
+                + authorizationHeaderShapeJson(token)
+                + "}");
+        // #endregion
         writeJson(exchange, 401, jsonError("Invalid Dremio token"));
         return;
       }
@@ -759,6 +946,25 @@ public final class AiChatBotPluginServer {
         if (userResponse.statusCode() < 400) {
           userContext = userResponse.body();
         }
+      }
+
+      if (!langchainGatewayBaseUrl.isBlank()) {
+        final String gatewayMessage =
+            userContext.isBlank()
+                ? prompt
+                : "--- Dremio user profile JSON (do not repeat secrets verbatim) ---\n"
+                    + userContext
+                    + "\n\nUser question:\n"
+                    + prompt;
+        sendLangChainGatewayRequest(
+            exchange,
+            client,
+            langchainGatewayBaseUrl,
+            token,
+            model,
+            gatewayMessage,
+            langchainGatewayTimeoutSeconds);
+        return;
       }
 
       if (cfg.aiBackendUrl == null || cfg.aiBackendUrl.isBlank()) {
@@ -812,6 +1018,39 @@ public final class AiChatBotPluginServer {
       writeJson(
           exchange, 500, jsonError("Failed to process chat request: " + sanitize(e.getMessage())));
     }
+  }
+
+  /**
+   * Forwards the user message to the LangChain HTTP gateway ({@code POST /gateway/chat}), which
+   * loads Dremio MCP tools via {@code /aichat/mcp-proxy} using the same {@code Authorization}
+   * token.
+   */
+  private static void sendLangChainGatewayRequest(
+      HttpExchange exchange,
+      HttpClient client,
+      String gatewayBaseUrl,
+      String authorizationHeader,
+      String model,
+      String message,
+      int timeoutSeconds)
+      throws IOException, InterruptedException {
+    final String base = stripTrailingSlash(gatewayBaseUrl);
+    final String url = base + "/gateway/chat";
+    final String requestBody =
+        "{\"message\":\"" + escapeJson(message) + "\",\"model\":\"" + escapeJson(model) + "\"}";
+    final HttpRequest req =
+        HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .header("Accept", APPLICATION_JSON_PLAIN)
+            .header(CONTENT_TYPE, APPLICATION_JSON_PLAIN)
+            .header("Authorization", authorizationHeader)
+            .timeout(Duration.ofSeconds(Math.max(1, timeoutSeconds)))
+            .POST(HttpRequest.BodyPublishers.ofString(requestBody, StandardCharsets.UTF_8))
+            .build();
+    final HttpResponse<String> resp =
+        client.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+    addCors(exchange);
+    writeJson(exchange, resp.statusCode(), resp.body());
   }
 
   private static void sendLlmRequest(

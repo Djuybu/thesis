@@ -243,6 +243,10 @@
           <execution>
             <id>default-cli</id>
             <configuration>
+              <!-- Repo-root conf/ (contains dremio.conf overrides, e.g. aichatbot plugin URL). -->
+              <additionalClasspathElements>
+                <additionalClasspathElement>${project.basedir}/../../conf</additionalClasspathElement>
+              </additionalClasspathElements>
               <classpathScope>test</classpathScope>
               <executable>java</executable>
               <arguments>

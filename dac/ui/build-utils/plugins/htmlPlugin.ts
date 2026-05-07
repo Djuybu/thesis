@@ -31,7 +31,7 @@ export const htmlPlugin = new HtmlWebpackPlugin({
     process.env.DREMIO_INJECTION_PATH ||
       process.env.DREMIO_DYN_LOADER_PATH ||
       join(__dirname, "../../src"),
-    "index.html"
+    "index.html",
   ),
   filename: indexFilename,
   cache: false,

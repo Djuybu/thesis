@@ -15,6 +15,7 @@
  */
 package com.dremio.dac.server;
 
+import com.dremio.config.DremioConfig;
 import com.dremio.dac.annotations.RestApiServer;
 import com.dremio.dac.daemon.DremioBinder;
 import com.dremio.dac.server.socket.SocketServlet;
@@ -152,6 +153,24 @@ public class WebServer implements Service {
     final ServletHolder wsHolder = new ServletHolder(servlet);
     wsHolder.setInitOrder(1);
     servletContextHandler.addServlet(wsHolder, "/apiv2/socket");
+
+    final String aiChatbotBaseUrl = AiChatbotPluginBaseUrlResolver.resolve(config);
+    final ServletHolder aiChatHolder;
+    if (aiChatbotBaseUrl == null || aiChatbotBaseUrl.isEmpty()) {
+      aiChatHolder = new ServletHolder(new AiChatbotPluginUnavailableServlet());
+      logger.info(
+          "AI chatbot plugin proxy disabled (no base URL). Set {} or dremio.conf {} or {}",
+          "DREMIO_AICHATBOT_PLUGIN_BASE_URL",
+          DremioConfig.WEB_AICHATBOT_PLUGIN_BASE_URL,
+          "dremio.aichatbot.plugin.base_url");
+    } else {
+      final ServletHolder proxyHolder = new ServletHolder(AiChatbotPluginProxyServlet.class);
+      proxyHolder.setInitParameter("targetBaseUrl", aiChatbotBaseUrl);
+      aiChatHolder = proxyHolder;
+      logger.info("AI chatbot plugin reverse proxy enabled for /aichat/* -> {}", aiChatbotBaseUrl);
+    }
+    aiChatHolder.setInitOrder(1);
+    servletContextHandler.addServlet(aiChatHolder, "/aichat/*");
 
     // Rest APIs.
     int initOrder = 2;

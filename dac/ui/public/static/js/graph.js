@@ -158,7 +158,7 @@ $(window).on("load", function () {
             "fill",
             graph.node(u).label.split(" ")[0].endsWith("Exchange")
               ? "white"
-              : fc
+              : fc,
           )
           .style("stroke", "#000")
           .style("stroke-width", "1px");
@@ -213,7 +213,7 @@ $(window).on("load", function () {
       .attr("width", chartprops.w + 2 * chartprops.margin)
       .attr(
         "height",
-        chartprops.h + 2 * chartprops.margin + 2 * chartprops.tickMargin
+        chartprops.h + 2 * chartprops.margin + 2 * chartprops.tickMargin,
       )
       .style("padding-left", "5px")
       .attr("class", "svg");
@@ -244,7 +244,7 @@ $(window).on("load", function () {
       .attr("fill", chartprops.backColor)
       .attr(
         "transform",
-        "translate(" + chartprops.margin + "," + chartprops.margin + ")"
+        "translate(" + chartprops.margin + "," + chartprops.margin + ")",
       );
 
     // bars
@@ -270,7 +270,7 @@ $(window).on("load", function () {
       .attr("fill", chartprops.barColor)
       .attr(
         "transform",
-        "translate(" + chartprops.margin + "," + chartprops.margin + ")"
+        "translate(" + chartprops.margin + "," + chartprops.margin + ")",
       );
 
     // grid lines
@@ -282,7 +282,7 @@ $(window).on("load", function () {
           (chartprops.bpad + chartprops.margin) +
           "," +
           (chartprops.h + chartprops.margin) +
-          ")"
+          ")",
       )
       .attr("class", "grid")
       .call(
@@ -290,7 +290,7 @@ $(window).on("load", function () {
           .axis()
           .scale(chartprops.scaler)
           .tickSize(-chartprops.h, 0)
-          .tickFormat("")
+          .tickFormat(""),
       );
     //.style("stroke", "#000")
     //.style("opacity", 0.2);
@@ -304,7 +304,7 @@ $(window).on("load", function () {
           (chartprops.bpad + chartprops.margin) +
           "," +
           (chartprops.h + chartprops.margin + chartprops.tickMargin) +
-          ")"
+          ")",
       )
       .attr("class", "grid")
       .call(
@@ -313,7 +313,7 @@ $(window).on("load", function () {
           .scale(chartprops.scaler)
           .orient("bottom")
           .tickSize(0, 0)
-          .tickFormat(d3.format(".2f"))
+          .tickFormat(d3.format(".2f")),
       )
       .selectAll("text")
       .attr("fill", chartprops.tickColor);

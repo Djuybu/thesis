@@ -17,5 +17,5 @@ import webpack from "webpack";
 import { dynLoadPath } from "../dyn-load";
 
 export const bannerPlugin = new webpack.BannerPlugin(
-  require(dynLoadPath + "/webpackBanner")
+  require(dynLoadPath + "/webpackBanner"),
 );
