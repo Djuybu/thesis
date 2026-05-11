@@ -39,8 +39,42 @@ export type ChatSession = {
   updatedAt: number;
   messages: ChatMessage[];
   pinned?: boolean;
+  threadId?: string;
 };
 
+export type HitlStatus = "interrupted" | "completed" | "error";
+
+export type HitlInterrupt = {
+  action: string;
+  message: string;
+  table_fqn?: string;
+  schema_text?: string;
+  discover_excerpt?: string;
+  proposed_sql?: string;
+  rationale?: string;
+};
+
+export type ChatApiResponse = {
+  status: HitlStatus;
+  thread_id: string;
+  model: string;
+  node?: string;
+  interrupt?: HitlInterrupt;
+  answer?: string;
+  execution_result?: unknown;
+  error?: string;
+};
+
+export type ConfigApiResponse = {
+  service: string;
+  version: string;
+  default_model: string;
+  hitl_enabled: boolean;
+  guardrail_enabled: boolean;
+  mcp_configured: boolean;
+};
+
+/** @deprecated kept for backward compat with old AskResponse shape */
 export type AskResponse = {
   response?: string;
   answer?: string;

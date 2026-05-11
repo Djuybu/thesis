@@ -7,4 +7,8 @@ dremio:
   pat: "REPLACE_WITH_YOUR_DREMIO_PAT"
 
 tools:
-  server_mode: FOR_SELF
+  # FOR_DATA_PATTERNS exposes only data exploration tools (schemas, search, SQL).
+  # Avoid FOR_SELF here: it loads cluster-monitoring tools (GetFailedJobDetails,
+  # GetNameOfJobsRecentTable, BuildUsageReport, ...) which small chat models tend
+  # to call by mistake for unrelated user questions, producing irrelevant answers.
+  server_mode: FOR_DATA_PATTERNS

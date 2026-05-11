@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 
 from fastapi import Request
@@ -30,9 +31,23 @@ _in_memory_history: dict[str, InMemoryChatMessageHistory] = {}
 
 
 def resolve_tenant(http_request: Request, session_id_raw: str | None, user_id_raw: str | None) -> TenantContext:
-    sid = (session_id_raw or http_request.headers.get("X-Chat-Session-Id") or http_request.headers.get("x-chat-session-id") or "default").strip() or "default"
+    sid = (session_id_raw or http_request.headers.get("X-Chat-Session-Id") or http_request.headers.get("x-chat-session-id") or "").strip()
     uid_header = http_request.headers.get("X-User-Id") or http_request.headers.get("x-user-id")
     uid = (user_id_raw or uid_header or "").strip() or None
+
+    # When no real session/user is provided, derive isolation from the auth token so
+    # that different Dremio login sessions never share the same history bucket.
+    if not sid or sid == "default":
+        if uid:
+            sid = f"user:{uid}"
+        else:
+            auth = (http_request.headers.get("authorization") or "").strip()
+            if auth:
+                token_hash = hashlib.sha256(auth.encode()).hexdigest()[:24]
+                sid = f"tok:{token_hash}"
+            else:
+                sid = "default"
+
     if uid:
         history_key = f"user:{uid}:session:{sid}"
         rag_tenant_id = f"user:{uid}"

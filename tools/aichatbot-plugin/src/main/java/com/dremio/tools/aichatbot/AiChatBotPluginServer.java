@@ -30,9 +30,6 @@ import java.net.http.HttpConnectTimeoutException;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -353,21 +350,6 @@ public final class AiChatBotPluginServer {
       writeJson(exchange, 401, jsonError("Missing Authorization header"));
       return;
     }
-    // #region agent log
-    debugLog(
-        "pre-fix",
-        "H-auth",
-        "AiChatBotPluginServer.java:handleMcpProxy",
-        "mcp_proxy_authorization_shape",
-        "{"
-            + "\"dremioBaseUrl\":\""
-            + escapeJson(dremioBaseUrl)
-            + "\",\"requestPath\":\""
-            + escapeJson(exchange.getRequestURI().getPath())
-            + "\",\"auth\":"
-            + authorizationHeaderShapeJson(token)
-            + "}");
-    // #endregion
     final String rawQuery = exchange.getRequestURI().getRawQuery();
     final String pathParam = parseQueryParameter(rawQuery, "path");
     final String path =
@@ -389,50 +371,14 @@ public final class AiChatBotPluginServer {
       return;
     }
     boolean sseResponseStarted = false;
-    long sseBytesForwarded = 0L;
     String proxyStage = "init";
     final String accept = exchange.getRequestHeaders().getFirst("Accept");
-    final String chatRunId =
-        firstNonBlank(exchange.getRequestHeaders().getFirst("X-Debug-Chat-Run-Id"), "");
     try {
       proxyStage = "request_received";
       log("[MCP Proxy] Forwarding " + method + " request to: " + upstreamUrl);
-      // #region agent log
-      debugLog(
-          "run1",
-          "H1",
-          "AiChatBotPluginServer.java:296",
-          "mcp_proxy_request_received",
-          "{\"method\":\""
-              + escapeJson(method)
-              + "\",\"path\":\""
-              + escapeJson(path)
-              + "\",\"accept\":\""
-              + escapeJson(firstNonBlank(accept, ""))
-              + "\",\"chatRunId\":\""
-              + escapeJson(chatRunId)
-              + "\"}");
-      // #endregion
       final HttpResponse<String> login = fetchLoginInfo(client, dremioBaseUrl, token);
       if (login.statusCode() >= 400) {
         log("[MCP Proxy] Invalid Dremio token verified via " + dremioBaseUrl);
-        // #region agent log
-        debugLog(
-            "pre-fix",
-            "H-login",
-            "AiChatBotPluginServer.java:handleMcpProxy",
-            "dremio_apiv2_login_rejected",
-            "{"
-                + "\"dremioBaseUrl\":\""
-                + escapeJson(dremioBaseUrl)
-                + "\",\"httpStatus\":"
-                + login.statusCode()
-                + ",\"responseBodyCharCount\":"
-                + login.body().length()
-                + ",\"auth\":"
-                + authorizationHeaderShapeJson(token)
-                + "}");
-        // #endregion
         writeJson(exchange, 401, jsonError("Invalid Dremio token"));
         return;
       }
@@ -462,51 +408,14 @@ public final class AiChatBotPluginServer {
           builder.header(CONTENT_TYPE, APPLICATION_JSON_PLAIN);
         }
         final byte[] raw = readRequestBodyBytes(exchange.getRequestBody());
-        final String rawBody = new String(raw, StandardCharsets.UTF_8);
-        final String rpcMethod = extractJsonString(rawBody, "method");
-        final String rpcId = extractJsonRawValue(rawBody, "id");
-        // #region agent log
-        debugLog(
-            "run6",
-            "H7",
-            "AiChatBotPluginServer.java:350",
-            "mcp_proxy_post_request_shape",
-            "{\"rpcMethod\":\""
-                + escapeJson(firstNonBlank(rpcMethod, ""))
-                + "\",\"rpcId\":\""
-                + escapeJson(firstNonBlank(rpcId, ""))
-                + "\",\"bodyLen\":"
-                + raw.length
-                + "}");
-        // #endregion
         builder.POST(HttpRequest.BodyPublishers.ofByteArray(raw));
         proxyStage = "post_send_upstream";
         final HttpResponse<String> upstream =
             client.send(
                 builder.build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
         log("[MCP Proxy] POST upstream responded with status: " + upstream.statusCode());
-        // #region agent log
-        debugLog(
-            "run1",
-            "H4",
-            "AiChatBotPluginServer.java:338",
-            "mcp_proxy_post_upstream_status",
-            "{\"status\":"
-                + upstream.statusCode()
-                + ",\"bodyLen\":"
-                + upstream.body().length()
-                + "}");
-        // #endregion
         final String respCt =
             upstream.headers().firstValue(CONTENT_TYPE).orElse(APPLICATION_JSON_PLAIN);
-        // #region agent log
-        debugLog(
-            "run2",
-            "H3",
-            "AiChatBotPluginServer.java:353",
-            "mcp_proxy_post_before_write_downstream",
-            "{\"status\":" + upstream.statusCode() + ",\"respCt\":\"" + escapeJson(respCt) + "\"}");
-        // #endregion
         proxyStage = "post_write_downstream";
         writeProxyRaw(
             exchange,
@@ -514,14 +423,6 @@ public final class AiChatBotPluginServer {
             upstream.body().getBytes(StandardCharsets.UTF_8),
             respCt,
             upstream.headers());
-        // #region agent log
-        debugLog(
-            "run2",
-            "H3",
-            "AiChatBotPluginServer.java:367",
-            "mcp_proxy_post_downstream_write_done",
-            "{\"status\":" + upstream.statusCode() + "}");
-        // #endregion
       } else {
         // GET — likely a long-lived SSE stream: NO per-request timeout so the connection
         // is not cut off after mcpProxyTimeoutSeconds. Streaming is piped directly.
@@ -541,14 +442,6 @@ public final class AiChatBotPluginServer {
         final HttpResponse<java.io.InputStream> upstream =
             client.send(builder.build(), HttpResponse.BodyHandlers.ofInputStream());
         log("[MCP Proxy] SSE stream opened with status: " + upstream.statusCode());
-        // #region agent log
-        debugLog(
-            "run1",
-            "H1",
-            "AiChatBotPluginServer.java:371",
-            "mcp_proxy_sse_opened",
-            "{\"status\":" + upstream.statusCode() + "}");
-        // #endregion
         final String respCt =
             upstream.headers().firstValue(CONTENT_TYPE).orElse("text/event-stream");
         addCors(exchange);
@@ -566,17 +459,8 @@ public final class AiChatBotPluginServer {
           while ((n = in.read(buf)) != -1) {
             out.write(buf, 0, n);
             out.flush();
-            sseBytesForwarded += n;
           }
         }
-        // #region agent log
-        debugLog(
-            "run1",
-            "H1",
-            "AiChatBotPluginServer.java:397",
-            "mcp_proxy_sse_loop_finished",
-            "{\"bytesForwarded\":" + sseBytesForwarded + "}");
-        // #endregion
         log("[MCP Proxy] SSE stream closed for: " + upstreamUrl);
         exchange.close();
       }
@@ -584,38 +468,8 @@ public final class AiChatBotPluginServer {
       Thread.currentThread().interrupt();
       writeJson(exchange, 500, jsonError("Interrupted"));
     } catch (Exception e) {
-      // #region agent log
-      debugLog(
-          "run1",
-          "H2",
-          "AiChatBotPluginServer.java:406",
-          "mcp_proxy_exception",
-          "{\"errorClass\":\""
-              + escapeJson(e.getClass().getName())
-              + "\",\"error\":\""
-              + escapeJson(sanitize(e.getMessage()))
-              + "\",\"stage\":\""
-              + escapeJson(proxyStage)
-              + "\",\"upstreamUrl\":\""
-              + escapeJson(upstreamUrl)
-              + "\"}");
-      // #endregion
       logErr("[MCP Proxy] Error forwarding request: " + e.getMessage());
       if (isUpstreamUnavailableException(e)) {
-        // #region agent log
-        debugLog(
-            "run5",
-            "H6",
-            "AiChatBotPluginServer.java:414",
-            "mcp_proxy_upstream_unavailable",
-            "{\"upstreamUrl\":\""
-                + escapeJson(upstreamUrl)
-                + "\",\"stage\":\""
-                + escapeJson(proxyStage)
-                + "\",\"errorClass\":\""
-                + escapeJson(e.getClass().getName())
-                + "\"}");
-        // #endregion
         writeJson(
             exchange,
             503,
@@ -625,33 +479,11 @@ public final class AiChatBotPluginServer {
       }
       if (isClientDisconnectException(e)) {
         log("[MCP Proxy] Client disconnected; suppressing downstream error response");
-        // #region agent log
-        debugLog(
-            "post-fix",
-            "H5",
-            "AiChatBotPluginServer.java:424",
-            "mcp_proxy_client_disconnect_suppressed",
-            "{\"method\":\""
-                + escapeJson(method)
-                + "\",\"stage\":\""
-                + escapeJson(proxyStage)
-                + "\",\"bytesForwarded\":"
-                + sseBytesForwarded
-                + "}");
-        // #endregion
         exchange.close();
         return;
       }
       if ("GET".equalsIgnoreCase(method) && sseResponseStarted && isClientDisconnectException(e)) {
         log("[MCP Proxy] SSE client disconnected; suppressing error response");
-        // #region agent log
-        debugLog(
-            "post-fix",
-            "H2",
-            "AiChatBotPluginServer.java:418",
-            "mcp_proxy_sse_client_disconnect_suppressed",
-            "{\"bytesForwarded\":" + sseBytesForwarded + "}");
-        // #endregion
         exchange.close();
         return;
       }
@@ -683,88 +515,6 @@ public final class AiChatBotPluginServer {
       current = current.getCause();
     }
     return false;
-  }
-
-  private static void debugLog(
-      String runId, String hypothesisId, String location, String message, String dataJson) {
-    // #region agent log
-    try {
-      final long ts = System.currentTimeMillis();
-      final String line =
-          "{\"sessionId\":\"9551b1\","
-              + "\"runId\":\""
-              + escapeJson(runId)
-              + "\","
-              + "\"hypothesisId\":\""
-              + escapeJson(hypothesisId)
-              + "\","
-              + "\"location\":\""
-              + escapeJson(location)
-              + "\","
-              + "\"message\":\""
-              + escapeJson(message)
-              + "\","
-              + "\"data\":"
-              + dataJson
-              + ","
-              + "\"timestamp\":"
-              + ts
-              + "}\n";
-      Files.writeString(
-          Paths.get("/home/djuybu/thesis/.cursor/debug-9551b1.log"),
-          line,
-          StandardCharsets.UTF_8,
-          StandardOpenOption.CREATE,
-          StandardOpenOption.APPEND);
-    } catch (Exception ignored) {
-      // avoid breaking request path if debug log file is unavailable
-    }
-    // #endregion
-  }
-
-  /**
-   * JSON object (no surrounding quotes) describing {@code Authorization} shape only — never
-   * includes the secret token value.
-   */
-  private static String authorizationHeaderShapeJson(String authorizationHeader) {
-    if (authorizationHeader == null) {
-      return "{\"present\":false}";
-    }
-    final String h = authorizationHeader;
-    final boolean leadingWs = !h.isEmpty() && Character.isWhitespace(h.charAt(0));
-    final boolean trailingWs = !h.isEmpty() && Character.isWhitespace(h.charAt(h.length() - 1));
-    final boolean hasCtl = h.chars().anyMatch(cp -> cp < 0x20 || cp == 0x7f);
-    final boolean startsWithBearer = h.length() >= 7 && h.regionMatches(true, 0, "Bearer ", 0, 7);
-    final String cred = (startsWithBearer ? h.substring(7) : h).trim();
-    final long dotCount = cred.chars().filter(ch -> ch == '.').count();
-    final String[] segs = cred.split("\\.", -1);
-    final int segCount = segs.length;
-    final boolean looksLikeThreePartJwt = segCount >= 3 && !segs[0].isEmpty() && !segs[1].isEmpty();
-    final boolean doubleBearer =
-        startsWithBearer && cred.length() >= 7 && cred.regionMatches(true, 0, "Bearer ", 0, 7);
-    return "{"
-        + "\"present\":true"
-        + ",\"headerCharCount\":"
-        + h.length()
-        + ",\"startsWithBearerSpace\":"
-        + startsWithBearer
-        + ",\"credentialCharCount\":"
-        + cred.length()
-        + ",\"dotCountInCredential\":"
-        + dotCount
-        + ",\"segmentCountByDot\":"
-        + segCount
-        + ",\"looksLikeThreePartJwt\":"
-        + looksLikeThreePartJwt
-        + ",\"doubleBearerInCredential\":"
-        + doubleBearer
-        + ",\"leadingWhitespace\":"
-        + leadingWs
-        + ",\"trailingWhitespace\":"
-        + trailingWs
-        + ",\"controlOrNonPrintable\":"
-        + hasCtl
-        + "}";
   }
 
   private static String parseQueryParameter(String query, String key) {
@@ -894,19 +644,6 @@ public final class AiChatBotPluginServer {
       writeJson(exchange, 401, "{\"error\":\"Missing Authorization header\"}");
       return;
     }
-    // #region agent log
-    debugLog(
-        "pre-fix",
-        "H-auth",
-        "AiChatBotPluginServer.java:handleAsk",
-        "ask_authorization_shape",
-        "{"
-            + "\"dremioBaseUrl\":\""
-            + escapeJson(dremioBaseUrl)
-            + "\",\"auth\":"
-            + authorizationHeaderShapeJson(token)
-            + "}");
-    // #endregion
 
     final String body = readRequestBody(exchange.getRequestBody());
     final String prompt = extractPrompt(body);
@@ -927,23 +664,6 @@ public final class AiChatBotPluginServer {
     try {
       final HttpResponse<String> loginCheckResponse = fetchLoginInfo(client, dremioBaseUrl, token);
       if (loginCheckResponse.statusCode() >= 400) {
-        // #region agent log
-        debugLog(
-            "pre-fix",
-            "H-login",
-            "AiChatBotPluginServer.java:handleAsk",
-            "ask_dremio_apiv2_login_rejected",
-            "{"
-                + "\"dremioBaseUrl\":\""
-                + escapeJson(dremioBaseUrl)
-                + "\",\"httpStatus\":"
-                + loginCheckResponse.statusCode()
-                + ",\"responseBodyCharCount\":"
-                + loginCheckResponse.body().length()
-                + ",\"auth\":"
-                + authorizationHeaderShapeJson(token)
-                + "}");
-        // #endregion
         writeJson(exchange, 401, jsonError("Invalid Dremio token"));
         return;
       }
@@ -984,6 +704,8 @@ public final class AiChatBotPluginServer {
             token,
             model,
             gatewayMessage,
+            sessionId,
+            firstNonBlank(username, ""),
             langchainGatewayTimeoutSeconds);
         return;
       }
@@ -1066,12 +788,22 @@ public final class AiChatBotPluginServer {
       String authorizationHeader,
       String model,
       String message,
+      String sessionId,
+      String userId,
       int timeoutSeconds)
       throws IOException, InterruptedException {
     final String base = stripTrailingSlash(gatewayBaseUrl);
     final String url = base + "/gateway/chat";
     final String requestBody =
-        "{\"message\":\"" + escapeJson(message) + "\",\"model\":\"" + escapeJson(model) + "\"}";
+        "{\"message\":\""
+            + escapeJson(message)
+            + "\",\"model\":\""
+            + escapeJson(model)
+            + "\",\"session_id\":\""
+            + escapeJson(sessionId != null ? sessionId : "")
+            + "\",\"user_id\":\""
+            + escapeJson(userId != null ? userId : "")
+            + "\"}";
     final HttpRequest req =
         HttpRequest.newBuilder()
             .uri(URI.create(url))
@@ -1511,71 +1243,6 @@ public final class AiChatBotPluginServer {
       return null;
     }
     return d.intValue();
-  }
-
-  private static String extractJsonString(String json, String key) {
-    if (json == null) {
-      return null;
-    }
-    final String marker = "\"" + key + "\"";
-    int p = json.indexOf(marker);
-    if (p < 0) {
-      return null;
-    }
-    int colon = json.indexOf(':', p + marker.length());
-    if (colon < 0) {
-      return null;
-    }
-    int i = colon + 1;
-    while (i < json.length() && Character.isWhitespace(json.charAt(i))) {
-      i++;
-    }
-    if (i >= json.length() || json.charAt(i) != '"') {
-      return null;
-    }
-    i++;
-    final StringBuilder sb = new StringBuilder();
-    while (i < json.length()) {
-      char ch = json.charAt(i++);
-      if (ch == '\\') {
-        if (i < json.length()) {
-          sb.append(json.charAt(i++));
-        }
-        continue;
-      }
-      if (ch == '"') {
-        return sb.toString();
-      }
-      sb.append(ch);
-    }
-    return null;
-  }
-
-  private static String extractJsonRawValue(String json, String key) {
-    if (json == null) {
-      return null;
-    }
-    final String marker = "\"" + key + "\"";
-    int p = json.indexOf(marker);
-    if (p < 0) {
-      return null;
-    }
-    int colon = json.indexOf(':', p + marker.length());
-    if (colon < 0) {
-      return null;
-    }
-    int i = colon + 1;
-    while (i < json.length() && Character.isWhitespace(json.charAt(i))) {
-      i++;
-    }
-    int start = i;
-    while (i < json.length() && ",}\r\n\t ".indexOf(json.charAt(i)) < 0) {
-      i++;
-    }
-    if (i <= start) {
-      return null;
-    }
-    return json.substring(start, i);
   }
 
   private static void handleStaticOrOptions(HttpExchange exchange, String prefix)

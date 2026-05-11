@@ -18,7 +18,7 @@ package com.dremio.dac.server;
 import com.dremio.config.DremioConfig;
 import com.google.common.base.Strings;
 
-/** Resolves the standalone aichatbot-plugin base URL (e.g. {@code http://127.0.0.1:9191}). */
+/** Resolves the Dremio SQL Agent gateway base URL (e.g. {@code http://127.0.0.1:9292}). */
 public final class AiChatbotPluginBaseUrlResolver {
   private static final String ENV_VAR = "DREMIO_AICHATBOT_PLUGIN_BASE_URL";
   private static final String SYS_PROP = "dremio.aichatbot.plugin.base_url";

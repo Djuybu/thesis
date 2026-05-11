@@ -191,63 +191,9 @@ export const apiMiddleware =
     })
       .then((res) => {
         if (res.ok) {
-          if (successType?.type === "ADD_NEW_SOURCE_SUCCESS") {
-            // #region agent log
-            fetch(
-              "http://127.0.0.1:7396/ingest/a0ff0746-9042-4bf7-8a34-3ceb88d836a4",
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  "X-Debug-Session-Id": "7c4be8",
-                },
-                body: JSON.stringify({
-                  sessionId: "7c4be8",
-                  runId: "pre-fix",
-                  hypothesisId: "H1",
-                  location: "reduxApiMiddlewareSafe.js:194",
-                  message:
-                    "Success descriptor payload type before withJsonBody",
-                  data: {
-                    actionType: successType.type,
-                    payloadType: typeof successType.payload,
-                  },
-                  timestamp: Date.now(),
-                }),
-              },
-            ).catch(() => {});
-            // #endregion
-          }
           return withJsonBody(res, successType).then((successTypeWithPayload) =>
             actionWith(successTypeWithPayload, [action, getState(), res]).then(
               (fsa) => {
-                if (successType?.type === "ADD_NEW_SOURCE_SUCCESS") {
-                  // #region agent log
-                  fetch(
-                    "http://127.0.0.1:7396/ingest/a0ff0746-9042-4bf7-8a34-3ceb88d836a4",
-                    {
-                      method: "POST",
-                      headers: {
-                        "Content-Type": "application/json",
-                        "X-Debug-Session-Id": "7c4be8",
-                      },
-                      body: JSON.stringify({
-                        sessionId: "7c4be8",
-                        runId: "pre-fix",
-                        hypothesisId: "H2",
-                        location: "reduxApiMiddlewareSafe.js:219",
-                        message: "Dispatched FSA payload shape",
-                        data: {
-                          actionType: fsa?.type,
-                          payloadType: typeof fsa?.payload,
-                          hasGet: typeof fsa?.payload?.get === "function",
-                        },
-                        timestamp: Date.now(),
-                      }),
-                    },
-                  ).catch(() => {});
-                  // #endregion
-                }
                 return next(fsa);
               },
             ),

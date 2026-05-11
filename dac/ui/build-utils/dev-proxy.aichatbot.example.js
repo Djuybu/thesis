@@ -16,7 +16,7 @@
 
 /**
  * Example webpack-dev-server proxy so the UI (port 3005) can call {@code /aichat/*} while the
- * standalone aichatbot-plugin runs on port 9191.
+ * Dremio SQL Agent gateway runs on port 9292.
  *
  * Usage from {@code dac/ui}:
  *
@@ -25,13 +25,12 @@
  *   npm run start
  * </pre>
  *
- * Then start the plugin jar with {@code DREMIO_BASE_URL} pointing at your coordinator (e.g.
- * {@code http://localhost:9047}).
+ * Then start the gateway with {@code dremio-sql-agent} (or uvicorn).
  */
 module.exports = {
   proxy: {
     "/aichat": {
-      target: "http://127.0.0.1:9191",
+      target: "http://127.0.0.1:9292",
       changeOrigin: false,
       secure: false,
     },

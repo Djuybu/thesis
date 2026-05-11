@@ -7,6 +7,8 @@
 
 from __future__ import annotations
 
+DEFAULT_OLLAMA_MODEL = "qwen3.5:4b"
+
 
 def env(name: str, default: str) -> str:
     import os

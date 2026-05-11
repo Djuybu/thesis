@@ -1,6 +1,6 @@
 # Pulls a small Qwen model for local testing (requires Ollama installed).
 $ErrorActionPreference = "Stop"
-$model = if ($env:OLLAMA_MODEL) { $env:OLLAMA_MODEL } else { "qwen2.5:3b" }
+$model = if ($env:OLLAMA_MODEL) { $env:OLLAMA_MODEL } else { "qwen3.5:4b" }
 
 if (-not (Get-Command ollama -ErrorAction SilentlyContinue)) {
   Write-Host "Ollama not found on PATH. Install from https://ollama.com then run:" -ForegroundColor Yellow

@@ -21,9 +21,11 @@ from pydantic import (
     field_validator,
 )
 from typing import (
+    Any,
+    Dict,
     List,
-    Union,
     Optional,
+    Union,
 )
 from dremioai.api.util import UStrEnum
 from datetime import datetime
@@ -213,12 +215,205 @@ class EnterpriseSearchResultsWrapper(BaseModel):
     results: List[EnterpriseSearchResultsObject] = Field(default_factory=list)
 
 
+class CatalogSearchApiResponse(BaseModel):
+    """Shape of ``GET /api/v3/catalog/search`` (Dremio OSS)."""
+
+    data: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+def _oss_dataset_row_kind(dataset_type: str | None) -> str | None:
+    """Map Dremio ``datasetType`` to TABLE / VIEW for agent discovery."""
+    if not dataset_type:
+        return None
+    u = dataset_type.upper()
+    if u == "VIRTUAL":
+        return "VIEW"
+    if u in ("PROMOTED", "DIRECT"):
+        return "TABLE"
+    return None
+
+
+def _oss_filter_wants_view_only(filter_str: str) -> bool | None:
+    """Interpret enterprise-style filter string from :class:`Search`."""
+    f = filter_str or ""
+    if '["VIEW"]' in f:
+        return True
+    if '["TABLE"]' in f:
+        return False
+    return None
+
+
+def _oss_tags_to_str(tags: Any) -> str:
+    if tags is None:
+        return ""
+    if isinstance(tags, dict):
+        lst = tags.get("tags") or tags.get("labels")
+        if isinstance(lst, list):
+            return ",".join(str(x) for x in lst)
+    return str(tags)
+
+
+async def _get_search_results_oss_catalog(
+    search: Search,
+    use_df: bool,
+    remove_catalog_name: Optional[bool],
+) -> EnterpriseSearchResultsWrapper | pd.DataFrame:
+    """On-prem Dremio has no ``POST /api/v3/search``; use catalog text search instead."""
+    # #region agent log
+    import time as _dbg_time
+
+    _t0 = _dbg_time.perf_counter()
+    # #endregion
+    del remove_catalog_name  # not applicable to catalog search API
+    client = AsyncHttpClient()
+    _q = search.query or ""
+    resp = await client.get(
+        "/api/v3/catalog/search",
+        params={"query": _q},
+        deser=CatalogSearchApiResponse,
+    )
+    # #region agent log
+    _t_after_http = _dbg_time.perf_counter()
+    try:
+        import json as _dbg_json
+
+        with open(
+            "/home/djuybu/thesis/.cursor/debug-a789f9.log",
+            "a",
+            encoding="utf-8",
+        ) as _df:
+            _df.write(
+                _dbg_json.dumps(
+                    {
+                        "sessionId": "a789f9",
+                        "hypothesisId": "H2,H5",
+                        "location": "search.py:_get_search_results_oss_catalog",
+                        "message": "after catalog/search GET",
+                        "data": {
+                            "query_len": len(_q),
+                            "query_preview": _q[:120],
+                            "api_raw_hits": len(resp.data or []),
+                            "use_df": use_df,
+                            "filter": (search.filter or "")[:80],
+                            "http_ms": round((_t_after_http - _t0) * 1000, 2),
+                        },
+                        "timestamp": int(_dbg_time.time() * 1000),
+                    },
+                    ensure_ascii=False,
+                )
+                + "\n"
+            )
+    except Exception:
+        pass
+    # #endregion
+    want_view = _oss_filter_wants_view_only(search.filter or "")
+
+    rows: list[dict[str, Any]] = []
+    for item in resp.data:
+        if (item.get("type") or "").upper() != "DATASET":
+            continue
+        kind = _oss_dataset_row_kind(item.get("datasetType"))
+        if kind is None:
+            continue
+        if want_view is True and kind != "VIEW":
+            continue
+        if want_view is False and kind != "TABLE":
+            continue
+        path = item.get("path")
+        if not path or not isinstance(path, list):
+            continue
+        name = ".".join(f'"{p}"' for p in path)
+        rows.append(
+            {
+                "path": path,
+                "name": name,
+                "type": kind,
+                "tags": _oss_tags_to_str(item.get("tags")),
+                "description": "",
+            }
+        )
+
+    cap = search.max_results if search.max_results is not None else 50
+    cap = max(1, min(cap, 500))
+    if len(rows) > cap:
+        rows = rows[:cap]
+
+    if use_df:
+        if not rows:
+            return pd.DataFrame(
+                columns=["path", "name", "type", "tags", "description", "schema"]
+            )
+        paths = [r["path"] for r in rows]
+        # #region agent log
+        _t_before_schema = _dbg_time.perf_counter()
+        # #endregion
+        if schemas := await get_schemas(paths, include_tags=True, flatten=True):
+            for ix, schema in enumerate(schemas):
+                if ix < len(rows):
+                    rows[ix]["schema"] = schema.get("schema")
+        # #region agent log
+        _t_end = _dbg_time.perf_counter()
+        try:
+            import json as _dbg_json
+
+            with open(
+                "/home/djuybu/thesis/.cursor/debug-a789f9.log",
+                "a",
+                encoding="utf-8",
+            ) as _df:
+                _df.write(
+                    _dbg_json.dumps(
+                        {
+                            "sessionId": "a789f9",
+                            "hypothesisId": "H2",
+                            "location": "search.py:_get_search_results_oss_catalog",
+                            "message": "after get_schemas batch",
+                            "data": {
+                                "filtered_dataset_rows": len(rows),
+                                "schema_batch_ms": round(
+                                    (_t_end - _t_before_schema) * 1000, 2
+                                ),
+                                "total_oss_path_ms": round((_t_end - _t0) * 1000, 2),
+                            },
+                            "timestamp": int(_dbg_time.time() * 1000),
+                        },
+                        ensure_ascii=False,
+                    )
+                    + "\n"
+                )
+        except Exception:
+            pass
+        # #endregion
+        return pd.DataFrame(data=rows)
+
+    wrapped: list[EnterpriseSearchResultsObject] = []
+    for r in rows:
+        cat = Category.VIEW if r["type"] == "VIEW" else Category.TABLE
+        labels = [x.strip() for x in r["tags"].split(",") if x.strip()]
+        wrapped.append(
+            EnterpriseSearchResultsObject(
+                category=cat,
+                catalog=EnterpriseSearchCatalogObject(
+                    path=r["path"],
+                    type=r["type"],
+                    labels=labels or None,
+                    wiki=r["description"] or None,
+                ),
+            )
+        )
+    return EnterpriseSearchResultsWrapper(results=wrapped)
+
+
 async def get_search_results(
     search: str | Search, use_df: bool = False,
     remove_catalog_name: Optional[bool] = True
 ) -> EnterpriseSearchResultsWrapper | pd.DataFrame:
     if isinstance(search, str):
         search = Search(query=search)
+
+    # Dremio Cloud uses project search; OSS exposes GET /api/v3/catalog/search only.
+    if not settings.instance().dremio.project_id:
+        return await _get_search_results_oss_catalog(search, use_df, remove_catalog_name)
 
     client = AsyncHttpClient()
     endpoint = (

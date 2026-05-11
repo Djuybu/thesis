@@ -1,5 +1,7 @@
 # Dremio MCP server
 
+**Chạy chat AI + MCP (tiếng Việt, các bước ngắn):** [docs/RUN-VI.md](docs/RUN-VI.md).
+
 Table of Contents
 
 - [Introduction](#introduction)

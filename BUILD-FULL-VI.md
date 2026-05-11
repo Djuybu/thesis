@@ -1,6 +1,6 @@
 # Hướng dẫn build toàn bộ dự án Dremio (OSS) + công cụ liên quan
 
-Tài liệu này tóm tắt cách **build cả monorepo Dremio** và các thành phần phụ trợ trong repo thesis (plugin chatbot, gateway LangChain, dremio-mcp). Phần lõi Dremio dựa trên [README.md](README.md) chính thức.
+Tài liệu này tóm tắt cách **build cả monorepo Dremio** và các thành phần phụ trợ trong repo thesis (Dremio SQL Agent gateway, dremio-mcp). Phần lõi Dremio dựa trên [README.md](README.md) chính thức.
 
 ---
 
@@ -56,14 +56,11 @@ cd /path/to/thesis   # hoặc dremio-oss
 ./mvnw clean install -DskipTests -Ddremio.oss-only=true
 ```
 
-Thư mục phân phối sẽ dạng `dremio-oss-{version}` thay vì bản “community” đầy đủ driver (xem [README.md](README.md) mục OSS Only).
-
 ### Sau khi build xong — chạy nhanh
 
 Theo README:
 
 ```bash
-# Gói server (đường dẫn chính xác phụ thuộc version trong distribution/server/target)
 distribution/server/target/dremio-community-*/dremio-community-*/bin/dremio start
 ```
 
@@ -77,7 +74,7 @@ UI: **http://localhost:9047**
 
 ---
 
-## 3. Cấu trúc build (để biết “toàn bộ” gồm gì)
+## 3. Cấu trúc build (để biết "toàn bộ" gồm gì)
 
 Các **module Maven** chính trong `pom.xml` gốc:
 
@@ -91,45 +88,80 @@ Các **module Maven** chính trong `pom.xml` gốc:
 | `services`, `provision`, … | Dịch vụ hỗ trợ |
 | `ui` | Frontend OSS |
 | `distribution` | Đóng gói tarball / server |
-| `tools` | Công cụ — gồm **`tools/aichatbot-plugin`** (plugin AI chatbot) |
-
-Build full `install` sẽ quét hết các module này (trừ khi bạn giới hạn `-pl`).
+| `tools` | Công cụ phụ trợ (attach-tool, testcontainers, …) |
 
 ---
 
-## 4. Chỉ build **plugin AI Chatbot** (nhanh, để test chat)
+## 4. Dremio SQL Agent Gateway (thay thế aichatbot-plugin)
 
-Không cần full Dremio nếu bạn chỉ cần JAR plugin:
+Hướng dẫn chạy từng bước (tiếng Việt): **[tools/dremio-mcp/docs/RUN-VI.md](tools/dremio-mcp/docs/RUN-VI.md)**.
+
+Gateway mới nằm trong **`tools/dremio-mcp`** (Python, không phải Maven module).
+
+### Cài đặt
 
 ```bash
-./mvnw -pl tools/aichatbot-plugin -DskipTests -Derrorprone.skip=true package
+cd tools/dremio-mcp
+python3 -m venv .venv && source .venv/bin/activate
+pip install -e .
 ```
 
-- **`-Derrorprone.skip=true`**: cần khi build **chỉ** plugin trên máy không có artifact nội bộ `dremio-errorprone` đã `install` từ cả tree (xem [tools/aichatbot-plugin/build-for-local-test.sh](tools/aichatbot-plugin/build-for-local-test.sh)).
+### Chạy gateway
 
-Nếu bạn đã **`./mvnw clean install -DskipTests`** full trước đó, `build-tools` đã vào `~/.m2` — có thể thử bỏ `errorprone.skip` khi build lại plugin.
+```bash
+# Cần Ollama chạy sẵn (mặc định port 11434)
+# Cần dremio-mcp server chạy ở port 8080
+dremio-sql-agent
+```
 
-JAR: `tools/aichatbot-plugin/target/dremio-aichatbot-plugin-*.jar`
+Hoặc trực tiếp:
+
+```bash
+python -m dremioai.gateway.app
+```
+
+Gateway mặc định chạy tại **http://127.0.0.1:9292** (cấu hình qua `GATEWAY_HOST`, `GATEWAY_PORT`).
+
+### Biến môi trường chính
+
+| Biến | Mặc định | Ghi chú |
+|------|----------|---------|
+| `OLLAMA_MODEL` | `qwen3.5:4b` | Ollama model id |
+| `OLLAMA_BASE_URL` | `http://127.0.0.1:11434` | Ollama API |
+| `DREMIO_MCP_URL` | `http://127.0.0.1:8080/mcp/` | Dremio MCP HTTP endpoint |
+| `GATEWAY_HOST` | `127.0.0.1` | Gateway bind host |
+| `GATEWAY_PORT` | `9292` | Gateway bind port |
+
+### API Endpoints
+
+| Method | Path | Mô tả |
+|--------|------|-------|
+| `GET` | `/aichat/health` | Health check |
+| `GET` | `/aichat/v1/config` | Service config |
+| `POST` | `/aichat/v1/chat` | Bắt đầu chat thread (HITL) |
+| `POST` | `/aichat/v1/chat/resume` | Resume sau HITL interrupt |
+
+Chi tiết API: [tools/dremio-mcp/docs/api-spec.md](tools/dremio-mcp/docs/api-spec.md).
 
 ---
 
-## 5. **Python** — LangChain gateway & dremio-mcp (ngoài Maven)
+## 5. **dremio-mcp** server
 
-Không nằm trong `mvnw install`:
+Theo [tools/dremio-mcp/README.md](tools/dremio-mcp/README.md) — thường **uv** + `dremio-mcp-server`.
 
-| Thành phần | Cách chuẩn bị |
-|------------|----------------|
-| **langchain-gateway** | Python 3.11+, `venv`, `pip install -r tools/aichatbot-plugin/langchain-gateway/requirements.txt`. Nếu thiếu `python3-venv` trên Ubuntu/WSL: `sudo apt install python3.12-venv` (chờ hết `unattended-upgrades` nếu bị lock), hoặc dùng **uv** để tạo venv không cần apt. |
-| **dremio-mcp** | Theo [tools/dremio-mcp/README.md](tools/dremio-mcp/README.md) — thường **uv** + `dremio-mcp-server`. |
-
-Triển khai end-to-end (OSS + plugin + MCP + Ollama + gateway): [tools/aichatbot-plugin/DEPLOYMENT.md](tools/aichatbot-plugin/DEPLOYMENT.md).  
-Chỉ chatbot: [tools/aichatbot-plugin/CHATBOT-DEPLOY.md](tools/aichatbot-plugin/CHATBOT-DEPLOY.md).
+Cấu hình: [tools/dremio-mcp/local/mcp-oss.yaml](tools/dremio-mcp/local/mcp-oss.yaml).
 
 ---
 
-## 6. Script gợi ý trong repo
+## 6. Triển khai end-to-end
 
-- [tools/aichatbot-plugin/build-for-local-test.sh](tools/aichatbot-plugin/build-for-local-test.sh) — build plugin (có `errorprone.skip`) + thử tạo venv gateway.
+Thứ tự khởi động:
+1. **Dremio** (port 9047)
+2. **Ollama** (port 11434) — `ollama serve` + `ollama pull qwen3.5:4b`
+3. **dremio-mcp server** (port 8080) — `cd tools/dremio-mcp && uv run dremio-mcp-server run -c local/mcp-oss.yaml --enable-streaming-http --port 8080`
+4. **SQL Agent gateway** (port 9292) — `dremio-sql-agent`
+
+Cấu hình Dremio: `conf/dremio.conf` → `services.coordinator.web.aichatbot.plugin.base_url = "http://127.0.0.1:9292"`
 
 ---
 
@@ -137,15 +169,17 @@ Chỉ chatbot: [tools/aichatbot-plugin/CHATBOT-DEPLOY.md](tools/aichatbot-plugin
 
 | Hiện tượng | Hướng xử lý |
 |------------|-------------|
-| `Could not find artifact ... dremio-errorprone` khi build **chỉ** plugin | Thêm `-Derrorprone.skip=true` **hoặc** chạy full install trước để cài `build-tools`. |
 | `apt` / `dpkg` lock (`unattended-upgrades`) | Đợi cập nhật xong; không kill giữa chừng. |
 | Build quá lâu / hết RAM | Dùng máy RAM đủ; hoặc chỉ `-pl` module cần thiết cho tác vụ hiện tại. |
 | Sai JDK | Đảm bảo `JAVA_HOME` trỏ JDK **21** khi chạy Maven cho repo này. |
+| MCP tools load timeout | Tăng `DREMIO_MCP_TIMEOUT_SECONDS`; kiểm tra dremio-mcp server đang chạy. |
+| Gateway 502 | Kiểm tra Dremio token hợp lệ, dremio-mcp server đang chạy, Ollama sẵn sàng. |
 
 ---
 
 ## 8. Tham chiếu nhanh
 
 - Build & chạy chính thức: [README.md](README.md) — mục *Quickstart: How to build and run Dremio*.
+- API spec: [tools/dremio-mcp/docs/api-spec.md](tools/dremio-mcp/docs/api-spec.md).
+- Kiến trúc MCP: [tools/dremio-mcp/docs/architecture.md](tools/dremio-mcp/docs/architecture.md).
 - Docker distribution: [distribution/docker/README.md](distribution/docker/README.md).
-- Contributing: [CONTRIBUTING.md](CONTRIBUTING.md) (nếu có).

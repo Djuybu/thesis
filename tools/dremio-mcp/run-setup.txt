@@ -1,0 +1,5 @@
+After rebuilding dremio, log in -> run a query -> get PAT -> paste in local/mcp-oss.yaml
+
+Run uv run dremio-mcp-server run -c local/mcp-oss.yaml --enable-streaming-http --port 8080 to turn mcp tools on
+
+Run run dremio-sql-agent --reload to run agent. Add --reload will make sure LangGraph server restarts every time there is a update automatically

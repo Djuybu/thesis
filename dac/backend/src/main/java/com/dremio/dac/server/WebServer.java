@@ -159,7 +159,7 @@ public class WebServer implements Service {
     if (aiChatbotBaseUrl == null || aiChatbotBaseUrl.isEmpty()) {
       aiChatHolder = new ServletHolder(new AiChatbotPluginUnavailableServlet());
       logger.info(
-          "AI chatbot plugin proxy disabled (no base URL). Set {} or dremio.conf {} or {}",
+          "AI SQL Agent gateway proxy disabled (no base URL). Set {} or dremio.conf {} or {}",
           "DREMIO_AICHATBOT_PLUGIN_BASE_URL",
           DremioConfig.WEB_AICHATBOT_PLUGIN_BASE_URL,
           "dremio.aichatbot.plugin.base_url");
@@ -167,7 +167,8 @@ public class WebServer implements Service {
       final ServletHolder proxyHolder = new ServletHolder(AiChatbotPluginProxyServlet.class);
       proxyHolder.setInitParameter("targetBaseUrl", aiChatbotBaseUrl);
       aiChatHolder = proxyHolder;
-      logger.info("AI chatbot plugin reverse proxy enabled for /aichat/* -> {}", aiChatbotBaseUrl);
+      logger.info(
+          "AI SQL Agent gateway reverse proxy enabled for /aichat/* -> {}", aiChatbotBaseUrl);
     }
     aiChatHolder.setInitOrder(1);
     servletContextHandler.addServlet(aiChatHolder, "/aichat/*");

@@ -525,15 +525,21 @@ class SearchTableAndViews(Tools):
             key that lists the entire schema of the table or view. You can rely on this schema and avoid
             calling GetSchemaOfTable tool.
         """
-        res = await run_in_parallel(
-            [
-                search.get_search_results(
-                    search.Search(query=query, filter=category), use_df=True
-                )
-                for category in (search.Category.TABLE, search.Category.VIEW)
-            ]
-        )
-        res = pd.concat(res)
+        # OSS: single catalog/search + one schema batch; Cloud keeps TABLE/VIEW split.
+        if not settings.instance().dremio.project_id:
+            res = await search.get_search_results(
+                search.Search(query=query), use_df=True
+            )
+        else:
+            res = await run_in_parallel(
+                [
+                    search.get_search_results(
+                        search.Search(query=query, filter=category), use_df=True
+                    )
+                    for category in (search.Category.TABLE, search.Category.VIEW)
+                ]
+            )
+            res = pd.concat(res)
         return {"results": res.to_dict(orient="records")}
 
 

@@ -34,7 +34,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 /**
- * Reverse-proxies {@code /aichat/*} to the standalone aichatbot-plugin HTTP server, preserving
+ * Reverse-proxies {@code /aichat/*} to the Dremio SQL Agent gateway (dremio-sql-agent), preserving
  * client headers needed for Dremio auth and MCP (including SSE streams for GET).
  */
 public final class AiChatbotPluginProxyServlet extends HttpServlet {

@@ -14,56 +14,38 @@
  * limitations under the License.
  */
 import localStorageUtils from "@inject/utils/storageUtils/localStorageUtils";
-import type { AskResponse, ChatSession } from "./types";
+import type { ChatApiResponse, ChatSession, ConfigApiResponse } from "./types";
 
 const STORAGE_KEY = "aichatbot-plugin-sessions";
 const SQL_DRAFT_KEY = "aichatbot-plugin-sql-draft";
-/** Browser fetch must outlive coordinator → plugin → gateway (align with long server defaults). */
 const REQUEST_TIMEOUT_MS = 86_500_000;
 
-/** Ollama model id when /aichat/config is unavailable (align with plugin default). */
-const FALLBACK_LLM_MODEL = "gemma4:e4b";
+let cachedConfig: ConfigApiResponse | null = null;
 
-let cachedPluginDefaultModel: string | null = null;
-
-async function resolveModelForAsk(): Promise<string> {
-  if (cachedPluginDefaultModel) {
-    return cachedPluginDefaultModel;
-  }
+async function loadConfig(): Promise<ConfigApiResponse | null> {
+  if (cachedConfig) return cachedConfig;
   try {
-    const res = await fetch("/aichat/config");
+    const res = await fetch("/aichat/v1/config");
     if (res.ok) {
-      const j = (await res.json()) as { defaultModel?: string };
-      const m = j.defaultModel != null ? String(j.defaultModel).trim() : "";
-      if (m) {
-        cachedPluginDefaultModel = m;
-        return m;
-      }
+      cachedConfig = (await res.json()) as ConfigApiResponse;
+      return cachedConfig;
     }
   } catch {
-    // ignore — use fallback
+    // ignore
   }
-  cachedPluginDefaultModel = FALLBACK_LLM_MODEL;
-  return cachedPluginDefaultModel;
+  return null;
 }
 
-/** True when the Dremio UI session has a token (same shape as other API calls). */
 export function hasAuthToken(): boolean {
   const token = localStorageUtils?.getAuthToken?.();
   return Boolean(token && String(token).trim());
 }
 
-/**
- * {@code localStorageUtils.getAuthToken()} returns {@code _dremio<secret>} for legacy REST;
- * aichat plugin + LangChain gateway expect {@code Bearer <secret>}.
- */
 function authorizationHeaderForAichat(
   uiToken: string | null | undefined,
 ): string | undefined {
   const raw = uiToken != null ? String(uiToken).trim() : "";
-  if (!raw) {
-    return undefined;
-  }
+  if (!raw) return undefined;
   const lower = raw.toLowerCase();
   if (lower.startsWith("bearer ")) {
     const secret = raw.slice(7).trim();
@@ -102,19 +84,15 @@ const getAuthHeaders = (): Record<string, string> => {
 async function readErrorMessage(response: Response): Promise<string> {
   try {
     const text = await response.text();
-    if (!text) {
-      return `HTTP ${response.status}`;
-    }
+    if (!text) return `HTTP ${response.status}`;
     try {
-      const json = JSON.parse(text) as { error?: string };
-      if (json && typeof json.error === "string" && json.error.trim()) {
-        return json.error.trim();
-      }
+      const json = JSON.parse(text) as { error?: string; detail?: string };
+      const msg = json?.error || json?.detail;
+      if (typeof msg === "string" && msg.trim()) return msg.trim();
     } catch {
       // not JSON
     }
-    const trimmed = text.trim().slice(0, 200);
-    return trimmed || `HTTP ${response.status}`;
+    return text.trim().slice(0, 200) || `HTTP ${response.status}`;
   } catch {
     return `HTTP ${response.status}`;
   }
@@ -140,14 +118,16 @@ export const chatService = {
     localStorage.setItem(SQL_DRAFT_KEY, sql);
   },
 
-  /**
-   * POST /aichat/ask on the same origin (DAC proxies to aichatbot-plugin).
-   * Body matches {@code AiChatBotPluginServer#handleAsk}: {@code prompt}, optional model fields.
-   */
-  async ask(prompt: string, signal?: AbortSignal): Promise<AskResponse> {
-    if (!hasAuthToken()) {
-      throw new Error("MISSING_AUTH");
-    }
+  async getConfig(): Promise<ConfigApiResponse | null> {
+    return loadConfig();
+  },
+
+  async startChat(
+    message: string,
+    threadId?: string,
+    signal?: AbortSignal,
+  ): Promise<ChatApiResponse> {
+    if (!hasAuthToken()) throw new Error("MISSING_AUTH");
 
     const controller = new AbortController();
     const timeout = window.setTimeout(
@@ -158,29 +138,81 @@ export const chatService = {
     signal?.addEventListener("abort", onAbort);
 
     try {
-      const model = await resolveModelForAsk();
-      const response = await fetch("/aichat/ask", {
+      const response = await fetch("/aichat/v1/chat", {
         method: "POST",
         headers: getAuthHeaders(),
         signal: controller.signal,
-        body: JSON.stringify({ prompt, model }),
+        body: JSON.stringify({
+          message,
+          ...(threadId ? { thread_id: threadId } : {}),
+        }),
       });
 
       if (!response.ok) {
         const detail = await readErrorMessage(response);
-        const err = new Error(
+        throw new Error(
           response.status === 401
             ? `HTTP 401: ${detail}`
             : `HTTP ${response.status}: ${detail}`,
         );
-        throw err;
       }
 
-      const payload = (await response.json()) as AskResponse;
-      return payload;
+      return (await response.json()) as ChatApiResponse;
     } finally {
       signal?.removeEventListener("abort", onAbort);
       window.clearTimeout(timeout);
     }
+  },
+
+  async resumeChat(
+    threadId: string,
+    action: "approve" | "reject" | "edit",
+    payload?: Record<string, unknown>,
+    signal?: AbortSignal,
+  ): Promise<ChatApiResponse> {
+    if (!hasAuthToken()) throw new Error("MISSING_AUTH");
+
+    const controller = new AbortController();
+    const timeout = window.setTimeout(
+      () => controller.abort(),
+      REQUEST_TIMEOUT_MS,
+    );
+    const onAbort = () => controller.abort();
+    signal?.addEventListener("abort", onAbort);
+
+    try {
+      const response = await fetch("/aichat/v1/chat/resume", {
+        method: "POST",
+        headers: getAuthHeaders(),
+        signal: controller.signal,
+        body: JSON.stringify({
+          thread_id: threadId,
+          action,
+          ...(payload ? { payload } : {}),
+        }),
+      });
+
+      if (!response.ok) {
+        const detail = await readErrorMessage(response);
+        throw new Error(`HTTP ${response.status}: ${detail}`);
+      }
+
+      return (await response.json()) as ChatApiResponse;
+    } finally {
+      signal?.removeEventListener("abort", onAbort);
+      window.clearTimeout(timeout);
+    }
+  },
+
+  /**
+   * @deprecated Kept for backward compatibility. Prefer startChat + resumeChat.
+   */
+  async ask(prompt: string, signal?: AbortSignal) {
+    const resp = await this.startChat(prompt, undefined, signal);
+    return {
+      answer: resp.answer ?? resp.error ?? "",
+      response: resp.answer,
+      data: [],
+    };
   },
 };

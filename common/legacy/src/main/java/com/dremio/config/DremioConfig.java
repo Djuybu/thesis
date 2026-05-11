@@ -36,13 +36,9 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.UnknownHostException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.Optional;
@@ -60,7 +56,6 @@ public class DremioConfig extends NestedConfig {
 
   private static final String REFERENCE_CONFIG = "dremio-reference.conf";
   private static final String DEFAULT_USER_CONFIG = "dremio.conf";
-  private static final Path DEBUG_LOG_PATH = Paths.get("/home/djuybu/thesis/.cursor/debug-947d4b.log");
 
   public static final String LOCAL_WRITE_PATH_STRING = "paths.local";
   public static final String DIST_WRITE_PATH_STRING = "paths.dist";
@@ -86,7 +81,7 @@ public class DremioConfig extends NestedConfig {
   public static final String WEB_PORT_INT = "services.coordinator.web.port";
 
   /**
-   * Base URL of the standalone aichatbot-plugin (e.g. {@code http://127.0.0.1:9191}). Empty =
+   * Base URL of the Dremio SQL Agent gateway (e.g. {@code http://127.0.0.1:9292}). Empty =
    * disabled; DAC returns 503 for {@code /aichat/*}. Override with {@code
    * DREMIO_AICHATBOT_PLUGIN_BASE_URL} or {@code -Ddremio.aichatbot.plugin.base_url=...}.
    */
@@ -351,42 +346,6 @@ public class DremioConfig extends NestedConfig {
     }
 
     if (!invalidPaths.isEmpty()) {
-      if (invalidPaths.stream().anyMatch(p -> p.startsWith("services.autonomous-reflection.ingest."))) {
-        // #region agent log
-        HashMap<String, Object> data = new HashMap<>();
-        data.put("invalidPaths", new ArrayList<>(invalidPaths));
-        data.put(
-            "userHasAutonomousReflectionIngestEnabled",
-            getInnerConfig().hasPath(AUTONOMOUS_REFLECTION_INGEST_ENABLED));
-        data.put(
-            "userHasAutonomousReflectionIngestUrl",
-            getInnerConfig().hasPath(AUTONOMOUS_REFLECTION_INGEST_URL));
-        data.put(
-            "userHasAutonomousReflectionIngestToken",
-            getInnerConfig().hasPath(AUTONOMOUS_REFLECTION_INGEST_TOKEN));
-        data.put(
-            "userHasAutonomousReflectionIngestIntervalMinutes",
-            getInnerConfig().hasPath(AUTONOMOUS_REFLECTION_INGEST_INTERVAL_MINUTES));
-        data.put(
-            "referenceHasAutonomousReflectionIngestEnabled",
-            resolvedReference.hasPath(AUTONOMOUS_REFLECTION_INGEST_ENABLED));
-        data.put(
-            "referenceHasAutonomousReflectionIngestUrl",
-            resolvedReference.hasPath(AUTONOMOUS_REFLECTION_INGEST_URL));
-        data.put(
-            "referenceHasAutonomousReflectionIngestToken",
-            resolvedReference.hasPath(AUTONOMOUS_REFLECTION_INGEST_TOKEN));
-        data.put(
-            "referenceHasAutonomousReflectionIngestIntervalMinutes",
-            resolvedReference.hasPath(AUTONOMOUS_REFLECTION_INGEST_INTERVAL_MINUTES));
-        debugLog(
-            "pre-fix",
-            "H2",
-            "DremioConfig.java:366",
-            "Invalid autonomous-reflection config paths detected",
-            data);
-        // #endregion
-      }
       StringBuilder sb = new StringBuilder();
       sb.append("Failure reading configuration file. The following properties were invalid:\n");
       for (String s : invalidPaths) {
@@ -484,44 +443,12 @@ public class DremioConfig extends NestedConfig {
       if (configUrl == null) {
         continue;
       }
-      // #region agent log
-      HashMap<String, Object> referenceCandidateData = new HashMap<>();
-      referenceCandidateData.put("classLoader", classLoader.getClass().getName());
-      referenceCandidateData.put("configUrl", configUrl.toString());
-      debugLog(
-          "pre-fix",
-          "H3",
-          "DremioConfig.java:488",
-          "Found reference config candidate",
-          referenceCandidateData);
-      // #endregion
       Preconditions.checkArgument(
           reference == null, "Attempted to load more than one reference configuration.");
       reference = ConfigFactory.parseResources(classLoader, REFERENCE_CONFIG);
     }
 
     Preconditions.checkNotNull(reference, "Unable to find the reference configuration.");
-    // #region agent log
-    HashMap<String, Object> referencePresenceData = new HashMap<>();
-    referencePresenceData.put(
-        "referenceHasAutonomousReflectionIngestEnabled",
-        reference.hasPath(AUTONOMOUS_REFLECTION_INGEST_ENABLED));
-    referencePresenceData.put(
-        "referenceHasAutonomousReflectionIngestUrl",
-        reference.hasPath(AUTONOMOUS_REFLECTION_INGEST_URL));
-    referencePresenceData.put(
-        "referenceHasAutonomousReflectionIngestToken",
-        reference.hasPath(AUTONOMOUS_REFLECTION_INGEST_TOKEN));
-    referencePresenceData.put(
-        "referenceHasAutonomousReflectionIngestIntervalMinutes",
-        reference.hasPath(AUTONOMOUS_REFLECTION_INGEST_INTERVAL_MINUTES));
-    debugLog(
-        "pre-fix",
-        "H1",
-        "DremioConfig.java:509",
-        "Reference config autonomous-reflection key presence",
-        referencePresenceData);
-    // #endregion
 
     Config userConfig = null;
 
@@ -635,28 +562,5 @@ public class DremioConfig extends NestedConfig {
               logger.debug("The environment variable DREMIO_HOME is not set.");
               return Paths.get(".");
             });
-  }
-
-  private static void debugLog(
-      String runId, String hypothesisId, String location, String message, HashMap<String, Object> data) {
-    try {
-      HashMap<String, Object> payload = new HashMap<>();
-      payload.put("sessionId", "947d4b");
-      payload.put("runId", runId);
-      payload.put("hypothesisId", hypothesisId);
-      payload.put("location", location);
-      payload.put("message", message);
-      payload.put("data", data);
-      payload.put("timestamp", System.currentTimeMillis());
-      Files.writeString(
-          DEBUG_LOG_PATH,
-          new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(payload)
-              + System.lineSeparator(),
-          StandardCharsets.UTF_8,
-          StandardOpenOption.CREATE,
-          StandardOpenOption.APPEND);
-    } catch (Exception ignored) {
-      // debug logging must never impact startup behavior
-    }
   }
 }

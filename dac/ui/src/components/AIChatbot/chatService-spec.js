@@ -16,7 +16,7 @@
 import localStorageUtils from "@inject/utils/storageUtils/localStorageUtils";
 import { chatService, hasAuthToken } from "./chatService";
 
-describe("AIChatbot chatService", () => {
+describe("AIChatbot chatService (v1 API)", () => {
   beforeEach(() => {
     localStorage.removeItem("aichatbot-plugin-sessions");
     localStorage.removeItem("aichatbot-plugin-sql-draft");
@@ -49,56 +49,79 @@ describe("AIChatbot chatService", () => {
     );
   });
 
-  it("calls ask endpoint with prompt body and auth headers", async () => {
-    sinon.stub(global, "fetch").callsFake((url) => {
-      if (String(url).includes("/aichat/config")) {
-        return Promise.resolve({
-          ok: true,
-          json: async () => ({ defaultModel: "test-model" }),
-        });
-      }
+  it("calls startChat endpoint with correct body and auth headers", async () => {
+    sinon.stub(global, "fetch").callsFake(() => {
       return Promise.resolve({
         ok: true,
-        json: async () => ({ response: "ok" }),
+        json: async () => ({
+          status: "completed",
+          thread_id: "t1",
+          model: "test",
+          answer: "ok",
+        }),
       });
     });
 
-    const payload = await chatService.ask("hello");
-    expect(payload.response).to.equal("ok");
+    const payload = await chatService.startChat("hello");
+    expect(payload.status).to.equal("completed");
+    expect(payload.answer).to.equal("ok");
     expect(global.fetch).to.have.been.called;
 
-    const askCall = global.fetch
+    const chatCall = global.fetch
       .getCalls()
-      .find((c) => String(c.args[0]).includes("/aichat/ask"));
-    expect(askCall).to.be.ok;
-    const [, options] = askCall.args;
+      .find((c) => String(c.args[0]).includes("/aichat/v1/chat"));
+    expect(chatCall).to.be.ok;
+    const [, options] = chatCall.args;
     expect(options.headers.Authorization).to.equal("Bearer secrettok");
     const body = JSON.parse(options.body);
-    expect(body).to.deep.equal({ prompt: "hello", model: "test-model" });
+    expect(body.message).to.equal("hello");
   });
 
   it("sends X-Dremio-Username when present in user data", async () => {
     localStorageUtils.getUserData.restore();
     sinon.stub(localStorageUtils, "getUserData").returns({ userName: "alice" });
-    sinon.stub(global, "fetch").callsFake((url) => {
-      if (String(url).includes("/aichat/config")) {
-        return Promise.resolve({
-          ok: true,
-          json: async () => ({ defaultModel: "m" }),
-        });
-      }
+    sinon.stub(global, "fetch").callsFake(() => {
       return Promise.resolve({
         ok: true,
-        json: async () => ({ answer: "ok" }),
+        json: async () => ({
+          status: "completed",
+          thread_id: "t2",
+          model: "m",
+          answer: "ok",
+        }),
       });
     });
 
-    await chatService.ask("q");
-    const askCall = global.fetch
+    await chatService.startChat("q");
+    const chatCall = global.fetch
       .getCalls()
-      .find((c) => String(c.args[0]).includes("/aichat/ask"));
-    const [, options] = askCall.args;
+      .find((c) => String(c.args[0]).includes("/aichat/v1/chat"));
+    const [, options] = chatCall.args;
     expect(options.headers["X-Dremio-Username"]).to.equal("alice");
+  });
+
+  it("calls resumeChat with correct action and thread_id", async () => {
+    sinon.stub(global, "fetch").callsFake(() => {
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          status: "completed",
+          thread_id: "t3",
+          model: "m",
+          answer: "executed",
+        }),
+      });
+    });
+
+    const payload = await chatService.resumeChat("t3", "approve");
+    expect(payload.status).to.equal("completed");
+    const resumeCall = global.fetch
+      .getCalls()
+      .find((c) => String(c.args[0]).includes("/aichat/v1/chat/resume"));
+    expect(resumeCall).to.be.ok;
+    const body = JSON.parse(resumeCall.args[1].body);
+    expect(body.thread_id).to.equal("t3");
+    expect(body.action).to.equal("approve");
   });
 
   it("hasAuthToken is false without token", () => {
@@ -107,13 +130,13 @@ describe("AIChatbot chatService", () => {
     expect(hasAuthToken()).to.equal(false);
   });
 
-  it("ask throws MISSING_AUTH when there is no token", async () => {
+  it("startChat throws MISSING_AUTH when there is no token", async () => {
     localStorageUtils.getAuthToken.restore();
     sinon.stub(localStorageUtils, "getAuthToken").returns(null);
 
     let caught;
     try {
-      await chatService.ask("hello");
+      await chatService.startChat("hello");
     } catch (e) {
       caught = e;
     }

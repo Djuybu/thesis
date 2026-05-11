@@ -22,11 +22,16 @@ import {
   parseMessageContent,
   uid,
 } from "./parser";
-import type { AskResponse, ChatMessage, ChatSession, DataRow } from "./types";
+import type {
+  ChatApiResponse,
+  ChatMessage,
+  ChatSession,
+  DataRow,
+  HitlInterrupt,
+} from "./types";
 import * as classes from "./AIChatbot.module.less";
 
 const SQL_DRAFT_KEY = "aichatbot-plugin-sql-draft";
-const METRICS_KEY = "aichatbot-plugin-ui-metrics";
 const MAX_PROMPT_LENGTH = 2000;
 const SOFT_PROMPT_LIMIT = 1600;
 const QUICK_PROMPTS = [
@@ -35,49 +40,31 @@ const QUICK_PROMPTS = [
   "Giải thích lỗi SQL và đề xuất cách sửa.",
 ];
 
-type MetricName =
-  | "messagesSent"
-  | "manualRetries"
-  | "quickActionsUsed"
-  | "sessionsCompleted";
-
-type MetricsSnapshot = Record<MetricName, number>;
-
-const EMPTY_METRICS: MetricsSnapshot = {
-  messagesSent: 0,
-  manualRetries: 0,
-  quickActionsUsed: 0,
-  sessionsCompleted: 0,
-};
-
-const loadMetrics = (): MetricsSnapshot => {
-  try {
-    const raw = localStorage.getItem(METRICS_KEY);
-    if (!raw) return EMPTY_METRICS;
-    const parsed = JSON.parse(raw) as Partial<MetricsSnapshot>;
-    return {
-      messagesSent: Number(parsed.messagesSent || 0),
-      manualRetries: Number(parsed.manualRetries || 0),
-      quickActionsUsed: Number(parsed.quickActionsUsed || 0),
-      sessionsCompleted: Number(parsed.sessionsCompleted || 0),
-    };
-  } catch {
-    return EMPTY_METRICS;
-  }
-};
-
-const saveMetrics = (metrics: MetricsSnapshot) => {
-  localStorage.setItem(METRICS_KEY, JSON.stringify(metrics));
-};
-
-const pickAnswerText = (payload: AskResponse) => {
-  const candidates = [payload.response, payload.answer, payload.content];
-  for (const value of candidates) {
-    if (typeof value === "string" && value.trim().length > 0) {
-      return value;
-    }
-  }
+const pickAnswerText = (payload: ChatApiResponse) => {
+  if (payload.answer && payload.answer.trim()) return payload.answer;
+  if (payload.error) return `Lỗi: ${payload.error}`;
   return "AI không trả về nội dung.";
+};
+
+const formatInterruptMessage = (interrupt: HitlInterrupt): string => {
+  if (interrupt.action === "metadata_confirmation") {
+    let msg = `**Xác nhận metadata trước khi sinh SQL:**\n\n`;
+    if (interrupt.table_fqn) msg += `- **Bảng:** \`${interrupt.table_fqn}\`\n`;
+    if (interrupt.schema_text)
+      msg += `- **Schema:** ${interrupt.schema_text.slice(0, 500)}...\n`;
+    msg += `\n${interrupt.message}`;
+    return msg;
+  }
+  if (interrupt.action === "sql_approval") {
+    let msg = `**Duyệt SQL trước khi thực thi:**\n\n`;
+    if (interrupt.table_fqn) msg += `- **Bảng:** \`${interrupt.table_fqn}\`\n`;
+    if (interrupt.proposed_sql)
+      msg += `\n\`\`\`sql\n${interrupt.proposed_sql}\n\`\`\`\n`;
+    if (interrupt.rationale) msg += `\n*${interrupt.rationale}*\n`;
+    msg += `\n${interrupt.message}`;
+    return msg;
+  }
+  return interrupt.message || "Cần phản hồi từ bạn.";
 };
 
 export const AIChatbot = () => {
@@ -89,11 +76,14 @@ export const AIChatbot = () => {
   const [historyFilter, setHistoryFilter] = useState("");
   const [lastPrompt, setLastPrompt] = useState("");
   const [lastLatencyMs, setLastLatencyMs] = useState<number | null>(null);
-  const [metrics, setMetrics] = useState<MetricsSnapshot>(loadMetrics);
   const [connectionStatus, setConnectionStatus] = useState<
     "idle" | "loading" | "ok" | "error"
   >("idle");
   const [codeWrap, setCodeWrap] = useState(false);
+  const [pendingInterrupt, setPendingInterrupt] =
+    useState<HitlInterrupt | null>(null);
+  const [pendingThreadId, setPendingThreadId] = useState<string | null>(null);
+  const [sqlEditValue, setSqlEditValue] = useState("");
   const [sessions, setSessions] = useState<ChatSession[]>(() => {
     const existing = chatService.loadSessions();
     return existing.length ? existing : [createSession()];
@@ -105,14 +95,6 @@ export const AIChatbot = () => {
   const messagesRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const requestControllerRef = useRef<AbortController | null>(null);
-
-  const trackMetric = (name: MetricName) => {
-    setMetrics((current) => {
-      const next = { ...current, [name]: current[name] + 1 };
-      saveMetrics(next);
-      return next;
-    });
-  };
 
   const activeSession = useMemo(
     () =>
@@ -187,6 +169,8 @@ export const AIChatbot = () => {
     const nextSessions = [session, ...sessions];
     persistSessions(nextSessions);
     setActiveSessionId(session.id);
+    setPendingInterrupt(null);
+    setPendingThreadId(null);
     setIsOpen(true);
   };
 
@@ -206,7 +190,6 @@ export const AIChatbot = () => {
     try {
       await navigator.clipboard.writeText(message.raw);
       setToast("Đã copy nội dung.");
-      trackMetric("quickActionsUsed");
     } catch {
       setToast("Không copy được nội dung.");
     }
@@ -214,6 +197,59 @@ export const AIChatbot = () => {
 
   const stopGenerating = () => {
     requestControllerRef.current?.abort();
+  };
+
+  const handleApiResponse = (payload: ChatApiResponse) => {
+    if (!activeSession) return;
+
+    if (payload.status === "interrupted" && payload.interrupt) {
+      const interrupt = payload.interrupt as HitlInterrupt;
+      setPendingInterrupt(interrupt);
+      setPendingThreadId(payload.thread_id);
+      if (interrupt.proposed_sql) {
+        setSqlEditValue(interrupt.proposed_sql);
+      }
+      updateSession(activeSession.id, (s) => ({
+        ...s,
+        threadId: payload.thread_id,
+      }));
+      const raw = formatInterruptMessage(interrupt);
+      appendMessage(activeSession.id, {
+        id: uid(),
+        role: "assistant",
+        raw,
+        parsed: parseMessageContent(raw),
+        createdAt: Date.now(),
+      });
+      setConnectionStatus("ok");
+    } else if (payload.status === "completed") {
+      setPendingInterrupt(null);
+      setPendingThreadId(null);
+      const raw = pickAnswerText(payload);
+      const dataRows: DataRow[] = Array.isArray(payload.execution_result)
+        ? payload.execution_result
+        : [];
+      appendMessage(activeSession.id, {
+        id: uid(),
+        role: "assistant",
+        raw,
+        parsed: parseMessageContent(raw, dataRows),
+        createdAt: Date.now(),
+      });
+      setConnectionStatus("ok");
+    } else {
+      setPendingInterrupt(null);
+      setPendingThreadId(null);
+      const raw = `Lỗi: ${payload.error || "Unknown error"}`;
+      appendMessage(activeSession.id, {
+        id: uid(),
+        role: "assistant",
+        raw,
+        parsed: parseMessageContent(raw),
+        createdAt: Date.now(),
+      });
+      setConnectionStatus("error");
+    }
   };
 
   const askAI = async (presetPrompt?: string) => {
@@ -234,37 +270,27 @@ export const AIChatbot = () => {
     setError("");
     setConnectionStatus("loading");
     setLastPrompt(value);
-    trackMetric("messagesSent");
     const startedAt = Date.now();
     const requestController = new AbortController();
     requestControllerRef.current = requestController;
-    const userMessage: ChatMessage = {
+
+    appendMessage(activeSession.id, {
       id: uid(),
       role: "user",
       raw: value,
       parsed: parseMessageContent(value),
       createdAt: Date.now(),
-    };
-
-    appendMessage(activeSession.id, userMessage);
+    });
     setInput("");
     setIsTyping(true);
 
     try {
-      const payload = await chatService.ask(value, requestController.signal);
-      const raw = pickAnswerText(payload);
-      const dataRows: DataRow[] = Array.isArray(payload.data)
-        ? payload.data
-        : [];
-      const aiMessage: ChatMessage = {
-        id: uid(),
-        role: "assistant",
-        raw,
-        parsed: parseMessageContent(raw, dataRows),
-        createdAt: Date.now(),
-      };
-      appendMessage(activeSession.id, aiMessage);
-      setConnectionStatus("ok");
+      const payload = await chatService.startChat(
+        value,
+        activeSession.threadId,
+        requestController.signal,
+      );
+      handleApiResponse(payload);
     } catch (e) {
       const isAbort =
         e instanceof DOMException && e.name.toLowerCase() === "aborterror";
@@ -278,14 +304,14 @@ export const AIChatbot = () => {
         rawMsg === "MISSING_AUTH"
           ? "Cần đăng nhập Dremio để dùng AI Chat."
           : rawMsg.startsWith("HTTP 401")
-            ? "Phiên đăng nhập không hợp lệ hoặc đã hết hạn. Hãy đăng nhập lại."
+            ? "Phiên đăng nhập không hợp lệ hoặc đã hết hạn."
             : rawMsg;
-      setError(`Lỗi khi gọi AI backend: ${msg}`);
+      setError(`Lỗi: ${msg}`);
       appendMessage(activeSession.id, {
         id: uid(),
         role: "assistant",
-        raw: `Lỗi khi gọi AI backend: ${msg}`,
-        parsed: parseMessageContent(`Lỗi khi gọi AI backend: ${msg}`),
+        raw: `Lỗi khi gọi AI: ${msg}`,
+        parsed: parseMessageContent(`Lỗi khi gọi AI: ${msg}`),
         createdAt: Date.now(),
       });
       setConnectionStatus("error");
@@ -293,9 +319,44 @@ export const AIChatbot = () => {
       requestControllerRef.current = null;
       setLastLatencyMs(Date.now() - startedAt);
       setIsTyping(false);
-      if (activeSession.messages.length > 2) {
-        trackMetric("sessionsCompleted");
-      }
+    }
+  };
+
+  const handleHitlAction = async (action: "approve" | "reject" | "edit") => {
+    if (!pendingThreadId || !activeSession) return;
+    setIsTyping(true);
+    setConnectionStatus("loading");
+    setError("");
+    const startedAt = Date.now();
+
+    const actionLabel =
+      action === "approve"
+        ? "Đã phê duyệt"
+        : action === "reject"
+          ? "Đã từ chối"
+          : "Đã sửa SQL";
+    appendMessage(activeSession.id, {
+      id: uid(),
+      role: "user",
+      raw: actionLabel,
+      parsed: parseMessageContent(actionLabel),
+      createdAt: Date.now(),
+    });
+
+    try {
+      const payload = await chatService.resumeChat(
+        pendingThreadId,
+        action,
+        action === "edit" ? { sql: sqlEditValue } : undefined,
+      );
+      handleApiResponse(payload);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Không rõ lỗi";
+      setError(`Lỗi resume: ${msg}`);
+      setConnectionStatus("error");
+    } finally {
+      setLastLatencyMs(Date.now() - startedAt);
+      setIsTyping(false);
     }
   };
 
@@ -346,26 +407,22 @@ export const AIChatbot = () => {
                     <span className={classes.badge}>
                       Latency: {lastLatencyMs ? `${lastLatencyMs}ms` : "N/A"}
                     </span>
-                    <span className={classes.badge}>Token: N/A</span>
                     <span className={classes.badge}>
-                      Kết nối API: {connectionStatus}
+                      API: {connectionStatus}
                     </span>
                   </div>
                 </div>
                 <div className={classes.headerActions}>
                   <button
                     className={classes.btn}
-                    onClick={() => {
-                      trackMetric("manualRetries");
-                      void askAI(lastPrompt);
-                    }}
+                    onClick={() => void askAI(lastPrompt)}
                     disabled={isTyping || !lastPrompt || !loggedIn}
                   >
                     Retry
                   </button>
                   {isTyping && (
                     <button className={classes.btn} onClick={stopGenerating}>
-                      Dừng tạo phản hồi
+                      Dừng
                     </button>
                   )}
                   <button
@@ -439,7 +496,6 @@ export const AIChatbot = () => {
                             try {
                               await navigator.clipboard.writeText(sql);
                               setToast("Đã copy SQL block.");
-                              trackMetric("quickActionsUsed");
                             } catch {
                               setToast("Không copy được SQL block.");
                             }
@@ -488,10 +544,7 @@ export const AIChatbot = () => {
                         <>
                           <button
                             className={classes.linkBtn}
-                            onClick={() => {
-                              trackMetric("manualRetries");
-                              void askAI(lastPrompt);
-                            }}
+                            onClick={() => void askAI(lastPrompt)}
                             disabled={isTyping || !lastPrompt || !loggedIn}
                           >
                             Regenerate
@@ -502,14 +555,13 @@ export const AIChatbot = () => {
                               message.feedback === "up" &&
                                 classes.linkBtnActive,
                             )}
-                            onClick={() => {
-                              trackMetric("quickActionsUsed");
+                            onClick={() =>
                               setMessageFeedback(
                                 activeSession.id,
                                 message.id,
                                 "up",
-                              );
-                            }}
+                              )
+                            }
                           >
                             Like
                           </button>
@@ -519,14 +571,13 @@ export const AIChatbot = () => {
                               message.feedback === "down" &&
                                 classes.linkBtnActive,
                             )}
-                            onClick={() => {
-                              trackMetric("quickActionsUsed");
+                            onClick={() =>
                               setMessageFeedback(
                                 activeSession.id,
                                 message.id,
                                 "down",
-                              );
-                            }}
+                              )
+                            }
                           >
                             Dislike
                           </button>
@@ -535,10 +586,7 @@ export const AIChatbot = () => {
                       {message.role === "user" && (
                         <button
                           className={classes.linkBtn}
-                          onClick={() => {
-                            trackMetric("quickActionsUsed");
-                            setInput(message.raw);
-                          }}
+                          onClick={() => setInput(message.raw)}
                         >
                           Edit prompt
                         </button>
@@ -551,7 +599,7 @@ export const AIChatbot = () => {
                     className={clsx(classes.bubble, classes.assistantBubble)}
                   >
                     <div className={classes.typingLabel}>
-                      Đang trả lời
+                      Đang xử lý
                       <span className={classes.typingCursor}>|</span>
                     </div>
                     <div className={classes.typing}>
@@ -567,53 +615,97 @@ export const AIChatbot = () => {
                   </div>
                 )}
               </div>
+
+              {/* HITL action bar */}
+              {pendingInterrupt && !isTyping && (
+                <div className={classes.inputBar}>
+                  {pendingInterrupt.action === "sql_approval" && (
+                    <textarea
+                      className={classes.input}
+                      value={sqlEditValue}
+                      rows={3}
+                      onChange={(e) => setSqlEditValue(e.target.value)}
+                      placeholder="Chỉnh sửa SQL nếu cần..."
+                    />
+                  )}
+                  <div className={classes.headerActions}>
+                    <button
+                      className={clsx(classes.btn, classes.primaryBtn)}
+                      onClick={() => void handleHitlAction("approve")}
+                      disabled={!loggedIn}
+                    >
+                      Phê duyệt
+                    </button>
+                    {pendingInterrupt.action === "sql_approval" && (
+                      <button
+                        className={classes.btn}
+                        onClick={() => void handleHitlAction("edit")}
+                        disabled={!loggedIn || !sqlEditValue.trim()}
+                      >
+                        Sửa &amp; Chạy
+                      </button>
+                    )}
+                    <button
+                      className={classes.btn}
+                      onClick={() => void handleHitlAction("reject")}
+                      disabled={!loggedIn}
+                    >
+                      Từ chối
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {!loggedIn && (
                 <div className={classes.errorText}>
-                  Đăng nhập Dremio để gửi câu hỏi tới AI (xác thực qua token
-                  giống các API khác).
+                  Đăng nhập Dremio để gửi câu hỏi tới AI.
                 </div>
               )}
               {error && <div className={classes.errorText}>{error}</div>}
               {toast && <div className={classes.toast}>{toast}</div>}
-              <footer className={classes.inputBar}>
-                <div className={classes.inputColumn}>
-                  <textarea
-                    ref={inputRef}
-                    className={classes.input}
-                    value={input}
-                    rows={3}
-                    placeholder="Nhập câu hỏi..."
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        void askAI();
-                      }
-                    }}
-                  />
-                  <div className={classes.inputMeta}>
-                    <span
-                      className={clsx(
-                        input.length >= SOFT_PROMPT_LIMIT && classes.warnText,
-                      )}
-                    >
-                      {input.length}/{MAX_PROMPT_LENGTH}
-                    </span>
-                    {input.length >= SOFT_PROMPT_LIMIT && (
-                      <span className={classes.warnText}>
-                        Prompt dài, có thể tăng độ trễ.
+
+              {/* Normal input bar (hidden when HITL is pending) */}
+              {!pendingInterrupt && (
+                <footer className={classes.inputBar}>
+                  <div className={classes.inputColumn}>
+                    <textarea
+                      ref={inputRef}
+                      className={classes.input}
+                      value={input}
+                      rows={3}
+                      placeholder="Nhập câu hỏi..."
+                      onChange={(e) => setInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          void askAI();
+                        }
+                      }}
+                    />
+                    <div className={classes.inputMeta}>
+                      <span
+                        className={clsx(
+                          input.length >= SOFT_PROMPT_LIMIT && classes.warnText,
+                        )}
+                      >
+                        {input.length}/{MAX_PROMPT_LENGTH}
                       </span>
-                    )}
+                      {input.length >= SOFT_PROMPT_LIMIT && (
+                        <span className={classes.warnText}>
+                          Prompt dài, có thể tăng độ trễ.
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
-                <button
-                  className={clsx(classes.btn, classes.primaryBtn)}
-                  onClick={() => void askAI()}
-                  disabled={isTyping || !input.trim() || !loggedIn}
-                >
-                  Send
-                </button>
-              </footer>
+                  <button
+                    className={clsx(classes.btn, classes.primaryBtn)}
+                    onClick={() => void askAI()}
+                    disabled={isTyping || !input.trim() || !loggedIn}
+                  >
+                    Send
+                  </button>
+                </footer>
+              )}
             </div>
             <aside className={classes.history}>
               <div className={classes.historyHeader}>
@@ -634,7 +726,11 @@ export const AIChatbot = () => {
                   className={clsx(classes.btn, classes.historyItem, {
                     [classes.historyItemActive]: session.id === activeSessionId,
                   })}
-                  onClick={() => setActiveSessionId(session.id)}
+                  onClick={() => {
+                    setActiveSessionId(session.id);
+                    setPendingInterrupt(null);
+                    setPendingThreadId(null);
+                  }}
                 >
                   <div className={classes.historyItemTitle}>
                     {session.pinned ? "[Pinned] " : ""}
@@ -709,13 +805,6 @@ export const AIChatbot = () => {
                   </div>
                 </button>
               ))}
-              <div className={classes.metricsBox}>
-                <strong>UX metrics</strong>
-                <div>messagesSent: {metrics.messagesSent}</div>
-                <div>manualRetries: {metrics.manualRetries}</div>
-                <div>quickActionsUsed: {metrics.quickActionsUsed}</div>
-                <div>sessionsCompleted: {metrics.sessionsCompleted}</div>
-              </div>
             </aside>
           </section>
         </div>

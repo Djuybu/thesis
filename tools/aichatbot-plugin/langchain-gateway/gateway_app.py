@@ -42,7 +42,7 @@ from lc_agents import (
     multi_agent_enabled,
     pick_tools_for_intent,
 )
-from lc_config import env, normalize_auth_header
+from lc_config import DEFAULT_OLLAMA_MODEL, env, normalize_auth_header
 from lc_grounding import (
     append_data_query_workflow,
     append_strict_grounding,
@@ -336,7 +336,7 @@ async def hitl_sql_start(http_request: Request, body: HitlSqlStartRequest) -> Hi
     if not env("GATEWAY_HITL_SQL_ENABLED", "true").strip().lower() in ("1", "true", "yes", "on"):
         raise HTTPException(status_code=404, detail="HITL SQL workflow is disabled (GATEWAY_HITL_SQL_ENABLED).")
 
-    model_name = body.model or env("OLLAMA_MODEL", "qwen2.5:3b")
+    model_name = body.model or env("OLLAMA_MODEL", DEFAULT_OLLAMA_MODEL)
     ollama_base = env("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
     try:
         mcp_client = _build_mcp_client(auth)
@@ -370,7 +370,7 @@ async def hitl_sql_resume(http_request: Request, body: HitlSqlResumeRequest) -> 
     if not env("GATEWAY_HITL_SQL_ENABLED", "true").strip().lower() in ("1", "true", "yes", "on"):
         raise HTTPException(status_code=404, detail="HITL SQL workflow is disabled (GATEWAY_HITL_SQL_ENABLED).")
 
-    model_name = env("OLLAMA_MODEL", "qwen2.5:3b")
+    model_name = env("OLLAMA_MODEL", DEFAULT_OLLAMA_MODEL)
     ollama_base = env("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
     try:
         mcp_client = _build_mcp_client(auth)
@@ -399,9 +399,10 @@ async def gateway_chat(http_request: Request, body: ChatRequest) -> ChatResponse
             detail="Missing Authorization header (same Bearer token as Dremio / aichat plugin).",
         )
 
-    model_name = body.model or env("OLLAMA_MODEL", "qwen2.5:3b")
+    model_name = body.model or env("OLLAMA_MODEL", DEFAULT_OLLAMA_MODEL)
     tenant = resolve_tenant(http_request, body.session_id, body.user_id)
     ollama_base = env("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
+
     mcp_url = env(
         "AICHAT_MCP_PROXY_URL",
         "http://127.0.0.1:9191/aichat/mcp-proxy?path=/mcp/",
@@ -441,6 +442,29 @@ async def gateway_chat(http_request: Request, body: ChatRequest) -> ChatResponse
             status_code=502,
             detail="Failed to load MCP tools: tools were not assigned.",
         )
+
+    # Filter out cluster-monitoring MCP tools that have no relevance to data
+    # exploration; small chat models (e.g. Gemma3 4B, Qwen 2.5 3B) tend to call
+    # them by mistake on unrelated requests, producing irrelevant answers (see
+    # GetFailedJobDetails hallucination). GetUsefulSystemTableNames is also
+    # blocked on Dremio OSS because it advertises DCS-only tables
+    # (sys.project.engines, sys.project.jobs_recent, sys.organization.users)
+    # that do not exist on OSS, so the agent ends up calling GetSchemaOfTable
+    # on a non-existent table and the whole agent loop crashes with a 400.
+    # Override via env if needed (e.g. on Dremio Cloud).
+    _default_blocklist = (
+        "GetFailedJobDetails,GetNameOfJobsRecentTable,"
+        "BuildUsageReport,GetUsefulSystemTableNames"
+    )
+    _blocklist = {
+        n.strip()
+        for n in env("AICHAT_MCP_TOOL_BLOCKLIST", _default_blocklist).split(",")
+        if n.strip()
+    }
+    if _blocklist:
+        mcp_tools = [
+            t for t in mcp_tools if getattr(t, "name", type(t).__name__) not in _blocklist
+        ]
 
     rag_mgr = default_rag_manager(ollama_base)
     has_rag = bool(rag_mgr and rag_mgr.has_index(tenant.rag_tenant_id))
@@ -493,9 +517,36 @@ async def gateway_chat(http_request: Request, body: ChatRequest) -> ChatResponse
     )
     _, history_backend = get_history_store(tenant.history_key)
 
+    # Deterministic FQN extraction: small/medium chat models (e.g. qwen3.5:4b,
+    # gemma3 4B) often hallucinate the placeholder values from tool docstring
+    # examples (`source`, `data`, `schema`, `table`) instead of using the
+    # user's explicit Dremio path. When the user message already carries a
+    # FQN like `Samples."samples.dremio.com"."SF_incidents2016.json"` we
+    # prepend a strong directive inside the HumanMessage itself (user-message
+    # attention dominates system-prompt attention for tool-arg grounding).
+    import re as _re_fqn
+    _fqn_re = _re_fqn.compile(
+        r'(?:[A-Za-z_]\w*|"[^"]+")(?:\.(?:[A-Za-z_]\w*|"[^"]+"))+'
+    )
+    _user_msg = body.message.strip()
+    _fqn_match = _fqn_re.search(_user_msg)
+    _agent_input_msg = _user_msg
+    if _fqn_match:
+        _fqn = _fqn_match.group(0)
+        _agent_input_msg = (
+            f"{_user_msg}\n\n"
+            f"[Tool grounding: the user explicitly provided this Dremio path: "
+            f"{_fqn}\n"
+            f"When you need a `table_name` argument (e.g. for GetSchemaOfTable, "
+            f"GetTableOrViewLineage, GetDescriptionOfTableOrSchema), pass exactly "
+            f"`{_fqn}` as the value. Do not substitute placeholder words like "
+            f"`source`, `data`, `schema`, `table`, or anything else from tool "
+            f"documentation examples.]"
+        )
+
     try:
         out: dict[str, Any] = await agent_with_history.ainvoke(
-            {"messages": [HumanMessage(content=body.message.strip())]},
+            {"messages": [HumanMessage(content=_agent_input_msg)]},
             config={
                 "recursion_limit": body.recursion_limit,
                 "configurable": {"session_id": tenant.history_key},
@@ -508,6 +559,7 @@ async def gateway_chat(http_request: Request, body: ChatRequest) -> ChatResponse
         ) from e
 
     msgs = out.get("messages") or []
+
     if not msgs:
         raise HTTPException(status_code=500, detail="Agent returned no messages.")
     last = msgs[-1]

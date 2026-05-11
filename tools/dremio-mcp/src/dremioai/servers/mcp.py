@@ -64,14 +64,6 @@ from dremioai.servers.jwks_verifier import JWKSVerifier, TokenExpiredError
 from dremioai.tools import tools
 from dremioai.tools.tools import ProjectIdMiddleware
 
-DEBUG_LOG_PATH = "/home/djuybu/dremio-oss/.cursor/debug-4811a9.log"
-DEBUG_SESSION_ID = "4811a9"
-
-
-def _agent_debug_log(run_id: str, hypothesis_id: str, location: str, message: str, data: Dict[str, Any]) -> None:
-    # instrumentation disabled after debugging
-    return
-
 
 class RequireAuthWithWWWAuthenticateMiddleware(BaseHTTPMiddleware):
     """
@@ -83,48 +75,6 @@ class RequireAuthWithWWWAuthenticateMiddleware(BaseHTTPMiddleware):
     logger = log.logger("RequireAuthWithWWWAuthenticateMiddleware")
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint):
-        if request.url.path.startswith("/mcp") and request.method.upper() == "POST":
-            try:
-                raw = await request.body()
-                payload = json.loads(raw.decode("utf-8")) if raw else {}
-                # #region agent log
-                _agent_debug_log(
-                    "run7",
-                    "M6",
-                    "mcp.py:101",
-                    "mcp_post_rpc_shape",
-                    {
-                        "path": request.url.path,
-                        "rpcMethod": payload.get("method", ""),
-                        "rpcId": payload.get("id", ""),
-                        "hasParams": isinstance(payload.get("params"), dict),
-                        "bodyLen": len(raw),
-                    },
-                )
-                # #endregion
-            except Exception as exc:
-                # #region agent log
-                _agent_debug_log(
-                    "run7",
-                    "M6",
-                    "mcp.py:115",
-                    "mcp_post_rpc_shape_parse_failed",
-                    {"path": request.url.path, "error": str(exc)[:200]},
-                )
-                # #endregion
-        # #region agent log
-        _agent_debug_log(
-            "run3",
-            "M1",
-            "mcp.py:95",
-            "mcp_request_received",
-            {
-                "path": request.url.path,
-                "method": request.method,
-                "has_user_attr": hasattr(request, "user"),
-            },
-        )
-        # #endregion
         # Check if user is authenticated (request.user is available after AuthenticationMiddleware)
         if (
             not hasattr(request, "user")
@@ -139,15 +89,6 @@ class RequireAuthWithWWWAuthenticateMiddleware(BaseHTTPMiddleware):
                 project_id=ProjectIdMiddleware.get_project_id(),
                 endpoint=str(settings.instance().dremio.uri),
             )
-            # #region agent log
-            _agent_debug_log(
-                "run3",
-                "M2",
-                "mcp.py:118",
-                "mcp_request_unauthorized",
-                {"path": request.url.path, "method": request.method},
-            )
-            # #endregion
             # Return 401 with WWW-Authenticate header
             return StarletteResponse(
                 content="Unauthorized",
@@ -156,15 +97,6 @@ class RequireAuthWithWWWAuthenticateMiddleware(BaseHTTPMiddleware):
             )
 
         # User is authenticated, proceed with the request
-        # #region agent log
-        _agent_debug_log(
-            "run3",
-            "M2",
-            "mcp.py:131",
-            "mcp_request_authorized",
-            {"path": request.url.path, "method": request.method},
-        )
-        # #endregion
         return await call_next(request)
 
 
@@ -302,87 +234,15 @@ def make_logged_invoke(tool_name: str, fn):
 
     @wraps(fn)
     async def _wrapper(*args, **kwargs):
-        started_ms = int(time.time() * 1000)
-        invocation_id = f"{tool_name}-{started_ms}"
-        kwargs_keys = sorted(list(kwargs.keys()))
-        heartbeat_task = None
-
-        async def _heartbeat():
-            while True:
-                await asyncio.sleep(15)
-                elapsed_ms = int(time.time() * 1000) - started_ms
-                # #region agent log
-                _agent_debug_log(
-                    "run5",
-                    "M5",
-                    "mcp.py:294",
-                    "mcp_tool_invoke_still_running",
-                    {
-                        "tool": tool_name,
-                        "invocationId": invocation_id,
-                        "elapsedMs": elapsed_ms,
-                    },
-                )
-                # #endregion
-
-        # #region agent log
-        _agent_debug_log(
-            "run3",
-            "M3",
-            "mcp.py:277",
-            "mcp_tool_invoke_started",
-            {
-                "tool": tool_name,
-                "invocationId": invocation_id,
-                "kwargsKeys": kwargs_keys,
-            },
-        )
-        # #endregion
-        heartbeat_task = asyncio.create_task(_heartbeat())
         try:
-            result = await fn(*args, **kwargs)
-            elapsed_ms = int(time.time() * 1000) - started_ms
-            # #region agent log
-            _agent_debug_log(
-                "run3",
-                "M3",
-                "mcp.py:287",
-                "mcp_tool_invoke_succeeded",
-                {
-                    "tool": tool_name,
-                    "invocationId": invocation_id,
-                    "elapsedMs": elapsed_ms,
-                },
-            )
-            # #endregion
-            return result
+            return await fn(*args, **kwargs)
         except Exception as exc:
-            elapsed_ms = int(time.time() * 1000) - started_ms
             _log.warning(
                 "Tool invocation raised an exception",
                 tool=tool_name,
                 error=str(exc),
             )
-            # #region agent log
-            _agent_debug_log(
-                "run3",
-                "M4",
-                "mcp.py:299",
-                "mcp_tool_invoke_failed",
-                {
-                    "tool": tool_name,
-                    "invocationId": invocation_id,
-                    "elapsedMs": elapsed_ms,
-                    "error": str(exc),
-                },
-            )
-            # #endregion
             raise
-        finally:
-            if heartbeat_task is not None:
-                heartbeat_task.cancel()
-                with contextlib.suppress(asyncio.CancelledError):
-                    await heartbeat_task
 
     return _wrapper
 

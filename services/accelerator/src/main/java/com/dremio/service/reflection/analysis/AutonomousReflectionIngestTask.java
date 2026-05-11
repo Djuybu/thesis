@@ -27,9 +27,6 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -59,8 +56,6 @@ public final class AutonomousReflectionIngestTask implements Runnable {
   private static final String LOCAL_TASK_LEADER_NAME = "autonomous-reflection-ingest";
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
-  private static final Path DEBUG_LOG_PATH =
-      Path.of("/home/djuybu/thesis/.cursor/debug-947d4b.log");
 
   /**
    * Regex that extracts column names from the SELECT list of a SQL statement. Handles both bare
@@ -137,29 +132,7 @@ public final class AutonomousReflectionIngestTask implements Runnable {
     SearchJobsRequest request = SearchJobsRequest.newBuilder().setLimit(1000).build();
 
     Iterable<JobSummary> jobsIterable = jobsServiceProvider.get().searchJobs(request);
-    // #region agent log
-    debugLog(
-        "pre-fix",
-        "H1",
-        "AutonomousReflectionIngestTask.java:138",
-        "searchJobs return type check",
-        Map.of(
-            "isIterable",
-            jobsIterable instanceof Iterable,
-            "isIterator",
-            jobsIterable instanceof Iterator,
-            "returnedClass",
-            jobsIterable.getClass().getName()));
-    // #endregion
     Iterator<JobSummary> jobs = jobsIterable.iterator();
-    // #region agent log
-    debugLog(
-        "pre-fix",
-        "H2",
-        "AutonomousReflectionIngestTask.java:151",
-        "iterator creation from iterable",
-        Map.of("iteratorClass", jobs.getClass().getName()));
-    // #endregion
 
     // datasetKey -> columnName -> counts
     Map<String, Map<String, int[]>> usageMap = new HashMap<>();
@@ -186,14 +159,6 @@ public final class AutonomousReflectionIngestTask implements Runnable {
       Map<String, int[]> colMap = usageMap.computeIfAbsent(datasetKey, k -> new HashMap<>());
       aggregateColumnsFromSql(sql, colMap);
     }
-    // #region agent log
-    debugLog(
-        "pre-fix",
-        "H3",
-        "AutonomousReflectionIngestTask.java:185",
-        "ingest loop summary",
-        Map.of("scannedJobs", scannedJobs, "datasetCount", usageMap.size()));
-    // #endregion
 
     if (usageMap.isEmpty()) {
       logger.debug("No new jobs in window [{}, {}], skipping ingest POST", startMs, endMs);
@@ -354,31 +319,5 @@ public final class AutonomousReflectionIngestTask implements Runnable {
                 .asClusteredSingleton(LOCAL_TASK_LEADER_NAME)
                 .build(),
             this);
-  }
-
-  private static void debugLog(
-      String runId,
-      String hypothesisId,
-      String location,
-      String message,
-      Map<String, Object> data) {
-    try {
-      Map<String, Object> payload = new HashMap<>();
-      payload.put("sessionId", "947d4b");
-      payload.put("runId", runId);
-      payload.put("hypothesisId", hypothesisId);
-      payload.put("location", location);
-      payload.put("message", message);
-      payload.put("data", data);
-      payload.put("timestamp", System.currentTimeMillis());
-      Files.writeString(
-          DEBUG_LOG_PATH,
-          MAPPER.writeValueAsString(payload) + System.lineSeparator(),
-          StandardCharsets.UTF_8,
-          StandardOpenOption.CREATE,
-          StandardOpenOption.APPEND);
-    } catch (Exception ignored) {
-      // debug logging must never affect runtime behavior
-    }
   }
 }

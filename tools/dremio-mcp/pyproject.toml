@@ -52,3 +52,4 @@ include = ["dremioai*"]
 
 [project.scripts]
 dremio-mcp-server = "dremioai.servers.mcp:cli"
+dremio-sql-agent = "dremioai.gateway.app:main"
