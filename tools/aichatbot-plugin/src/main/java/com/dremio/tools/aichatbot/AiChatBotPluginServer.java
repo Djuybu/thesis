@@ -34,8 +34,13 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Deque;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
@@ -53,6 +58,8 @@ public final class AiChatBotPluginServer {
   private static final String CONTENT_TYPE = "Content-Type";
   private static final String APPLICATION_JSON = "application/json; charset=utf-8";
   private static final String APPLICATION_JSON_PLAIN = "application/json";
+  private static final int MAX_HISTORY_MESSAGES_PER_SESSION = 200;
+  private static final int MAX_HISTORY_MESSAGES_FOR_PROMPT = 20;
 
   /** Pass-through JSON to a custom gateway (legacy). */
   private static final String MODE_CUSTOM = "custom";
@@ -152,6 +159,7 @@ public final class AiChatBotPluginServer {
                 return t;
               }
             });
+    final ChatHistoryStore historyStore = new ChatHistoryStore(MAX_HISTORY_MESSAGES_PER_SESSION);
 
     final LlmConfig llmConfig =
         new LlmConfig(
@@ -174,6 +182,9 @@ public final class AiChatBotPluginServer {
     server.createContext(
         "/aichat/context", exchange -> handleContext(exchange, httpClient, dremioBaseUrl));
     server.createContext(
+        "/aichat/history",
+        exchange -> handleHistory(exchange, httpClient, dremioBaseUrl, historyStore));
+    server.createContext(
         "/aichat/ask",
         exchange ->
             handleAsk(
@@ -181,6 +192,7 @@ public final class AiChatBotPluginServer {
                 httpClient,
                 dremioBaseUrl,
                 llmConfig,
+                historyStore,
                 langchainGatewayBaseUrl,
                 langchainGatewayTimeoutSeconds));
     server.createContext(
@@ -864,6 +876,7 @@ public final class AiChatBotPluginServer {
       HttpClient client,
       String dremioBaseUrl,
       LlmConfig cfg,
+      ChatHistoryStore historyStore,
       String langchainGatewayBaseUrl,
       int langchainGatewayTimeoutSeconds)
       throws IOException {
@@ -897,6 +910,8 @@ public final class AiChatBotPluginServer {
 
     final String body = readRequestBody(exchange.getRequestBody());
     final String prompt = extractPrompt(body);
+    final String bodySessionId = extractStringValue(body, "sessionId");
+    final String headerSessionId = exchange.getRequestHeaders().getFirst("X-Chat-Session-Id");
     final String requestedModel = extractStringValue(body, "model");
     final String model =
         requestedModel == null || requestedModel.isBlank() ? cfg.defaultAiModel : requestedModel;
@@ -938,6 +953,12 @@ public final class AiChatBotPluginServer {
               extractStringValue(loginCheckResponse.body(), "userName"),
               extractStringValue(loginCheckResponse.body(), "username"),
               exchange.getRequestHeaders().getFirst("X-Dremio-Username"));
+      final String sessionId =
+          firstNonBlank(
+              trimToNull(bodySessionId),
+              trimToNull(headerSessionId),
+              username == null || username.isBlank() ? null : "user:" + username,
+              "default");
 
       String userContext = "";
       if (username != null && !username.isBlank()) {
@@ -978,12 +999,18 @@ public final class AiChatBotPluginServer {
                 + escapeJson(firstNonBlank(username, ""))
                 + "\",\"llmMode\":\""
                 + escapeJson(cfg.llmMode)
+                + "\",\"sessionId\":\""
+                + escapeJson(sessionId)
                 + "\"}";
         writeJson(exchange, 200, answer);
         return;
       }
 
+      historyStore.append(sessionId, "user", prompt);
+
       if (MODE_CUSTOM.equalsIgnoreCase(cfg.llmMode)) {
+        final ArrayList<ChatHistoryEntry> recentHistory =
+            historyStore.read(sessionId, MAX_HISTORY_MESSAGES_FOR_PROMPT);
         final String aiRequestBody =
             "{"
                 + "\"prompt\":\""
@@ -997,11 +1024,17 @@ public final class AiChatBotPluginServer {
                 + "\","
                 + "\"dremioUserContext\":"
                 + (userContext.isBlank() ? "null" : "\"" + escapeJson(userContext) + "\"")
+                + ",\"sessionId\":\""
+                + escapeJson(sessionId)
+                + "\",\"chatHistory\":"
+                + buildChatHistoryJsonArray(recentHistory)
                 + "}";
-        sendLlmRequest(exchange, client, cfg, aiRequestBody);
+        sendLlmRequest(exchange, client, cfg, aiRequestBody, historyStore, sessionId);
         return;
       }
 
+      final ArrayList<ChatHistoryEntry> recentHistory =
+          historyStore.read(sessionId, MAX_HISTORY_MESSAGES_FOR_PROMPT);
       final String systemBlock =
           (overrideSystem != null && !overrideSystem.isBlank() ? overrideSystem : cfg.systemPrompt)
               + (userContext.isBlank()
@@ -1009,8 +1042,9 @@ public final class AiChatBotPluginServer {
                   : "\n\n--- Dremio user profile (JSON, do not repeat verbatim if sensitive) ---\n"
                       + userContext);
       final String openAiBody =
-          buildOpenAiChatCompletionsBody(model, systemBlock, prompt, temperature, maxTokens);
-      sendLlmRequest(exchange, client, cfg, openAiBody);
+          buildOpenAiChatCompletionsBody(
+              model, systemBlock, recentHistory, prompt, temperature, maxTokens);
+      sendLlmRequest(exchange, client, cfg, openAiBody, historyStore, sessionId);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       writeJson(exchange, 500, jsonError("Interrupted while processing request"));
@@ -1053,8 +1087,213 @@ public final class AiChatBotPluginServer {
     writeJson(exchange, resp.statusCode(), resp.body());
   }
 
+  /**
+   * In-memory chat history APIs.
+   *
+   * <p>- POST /aichat/history body:
+   * {"sessionId":"...","role":"user|assistant|system","message":"..."}
+   *
+   * <p>- GET /aichat/history?sessionId=...&limit=50
+   *
+   * <p>- DELETE /aichat/history?sessionId=...
+   */
+  private static void handleHistory(
+      HttpExchange exchange, HttpClient client, String dremioBaseUrl, ChatHistoryStore store)
+      throws IOException {
+    addCors(exchange);
+    if (handleOptions(exchange)) {
+      return;
+    }
+    final String token = getAuthorization(exchange);
+    if (token == null) {
+      writeJson(exchange, 401, jsonError("Missing Authorization header"));
+      return;
+    }
+    try {
+      final HttpResponse<String> login = fetchLoginInfo(client, dremioBaseUrl, token);
+      if (login.statusCode() >= 400) {
+        writeJson(exchange, 401, jsonError("Invalid Dremio token"));
+        return;
+      }
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      writeJson(exchange, 500, jsonError("Interrupted while validating token"));
+      return;
+    } catch (Exception e) {
+      writeJson(exchange, 500, jsonError("Failed to validate token: " + sanitize(e.getMessage())));
+      return;
+    }
+
+    final String method = exchange.getRequestMethod();
+    if ("POST".equalsIgnoreCase(method)) {
+      final String body = readRequestBody(exchange.getRequestBody());
+      final String sessionId = extractStringValue(body, "sessionId");
+      final String role = normalizeHistoryRole(extractStringValue(body, "role"));
+      final String message = extractStringValue(body, "message");
+      if (sessionId == null || sessionId.isBlank()) {
+        writeJson(exchange, 400, jsonError("Field 'sessionId' is required"));
+        return;
+      }
+      if (role == null) {
+        writeJson(exchange, 400, jsonError("Field 'role' must be one of: user, assistant, system"));
+        return;
+      }
+      if (message == null || message.isBlank()) {
+        writeJson(exchange, 400, jsonError("Field 'message' is required"));
+        return;
+      }
+      final ChatHistoryEntry saved = store.append(sessionId, role, message);
+      writeJson(
+          exchange,
+          200,
+          "{"
+              + "\"saved\":true,"
+              + "\"sessionId\":\""
+              + escapeJson(saved.sessionId)
+              + "\","
+              + "\"role\":\""
+              + escapeJson(saved.role)
+              + "\","
+              + "\"message\":\""
+              + escapeJson(saved.message)
+              + "\","
+              + "\"timestamp\":\""
+              + escapeJson(saved.timestampIso)
+              + "\""
+              + "}");
+      return;
+    }
+
+    final String query = exchange.getRequestURI().getRawQuery();
+    final String sessionId = parseQueryParameter(query, "sessionId");
+    if (sessionId == null || sessionId.isBlank()) {
+      writeJson(exchange, 400, jsonError("Query 'sessionId' is required"));
+      return;
+    }
+
+    if ("GET".equalsIgnoreCase(method)) {
+      final int limit = parsePositiveIntOrDefault(parseQueryParameter(query, "limit"), 50);
+      final ArrayList<ChatHistoryEntry> history = store.read(sessionId, limit);
+      final StringBuilder sb = new StringBuilder();
+      sb.append("{\"sessionId\":\"").append(escapeJson(sessionId)).append("\",");
+      sb.append("\"count\":").append(history.size()).append(",");
+      sb.append("\"messages\":[");
+      for (int i = 0; i < history.size(); i++) {
+        if (i > 0) {
+          sb.append(',');
+        }
+        final ChatHistoryEntry e = history.get(i);
+        sb.append("{\"role\":\"")
+            .append(escapeJson(e.role))
+            .append("\",\"message\":\"")
+            .append(escapeJson(e.message))
+            .append("\",\"timestamp\":\"")
+            .append(escapeJson(e.timestampIso))
+            .append("\"}");
+      }
+      sb.append("]}");
+      writeJson(exchange, 200, sb.toString());
+      return;
+    }
+
+    if ("DELETE".equalsIgnoreCase(method)) {
+      final int removed = store.clear(sessionId);
+      writeJson(
+          exchange,
+          200,
+          "{"
+              + "\"deleted\":true,"
+              + "\"sessionId\":\""
+              + escapeJson(sessionId)
+              + "\","
+              + "\"removed\":"
+              + removed
+              + "}");
+      return;
+    }
+
+    writeJson(exchange, 405, jsonError("Method not allowed"));
+  }
+
+  private static int parsePositiveIntOrDefault(String raw, int fallback) {
+    if (raw == null || raw.isBlank()) {
+      return fallback;
+    }
+    try {
+      final int parsed = Integer.parseInt(raw.trim());
+      return parsed > 0 ? parsed : fallback;
+    } catch (NumberFormatException e) {
+      return fallback;
+    }
+  }
+
+  private static String normalizeHistoryRole(String role) {
+    if (role == null || role.isBlank()) {
+      return null;
+    }
+    final String v = role.trim().toLowerCase(Locale.ROOT);
+    if ("user".equals(v) || "assistant".equals(v) || "system".equals(v)) {
+      return v;
+    }
+    return null;
+  }
+
+  private static String trimToNull(String s) {
+    if (s == null) {
+      return null;
+    }
+    final String t = s.trim();
+    return t.isBlank() ? null : t;
+  }
+
+  private static String buildChatHistoryJsonArray(ArrayList<ChatHistoryEntry> history) {
+    if (history == null || history.isEmpty()) {
+      return "[]";
+    }
+    final StringBuilder sb = new StringBuilder();
+    sb.append('[');
+    for (int i = 0; i < history.size(); i++) {
+      if (i > 0) {
+        sb.append(',');
+      }
+      final ChatHistoryEntry e = history.get(i);
+      sb.append("{\"role\":\"")
+          .append(escapeJson(e.role))
+          .append("\",\"message\":\"")
+          .append(escapeJson(e.message))
+          .append("\",\"timestamp\":\"")
+          .append(escapeJson(e.timestampIso))
+          .append("\"}");
+    }
+    sb.append(']');
+    return sb.toString();
+  }
+
+  private static String extractAssistantMessageForHistory(LlmConfig cfg, String responseBody) {
+    if (responseBody == null || responseBody.isBlank()) {
+      return null;
+    }
+    final String openAiContent = tryExtractOpenAiMessageContent(responseBody);
+    if (openAiContent != null && !openAiContent.isBlank()) {
+      return openAiContent;
+    }
+    final String wrappedAnswer = extractStringValue(responseBody, "answer");
+    if (wrappedAnswer != null && !wrappedAnswer.isBlank()) {
+      return wrappedAnswer;
+    }
+    if (MODE_CUSTOM.equalsIgnoreCase(cfg.llmMode)) {
+      return responseBody;
+    }
+    return null;
+  }
+
   private static void sendLlmRequest(
-      HttpExchange exchange, HttpClient client, LlmConfig cfg, String requestBody)
+      HttpExchange exchange,
+      HttpClient client,
+      LlmConfig cfg,
+      String requestBody,
+      ChatHistoryStore historyStore,
+      String sessionId)
       throws IOException, InterruptedException {
     final HttpRequest.Builder aiRequestBuilder =
         HttpRequest.newBuilder()
@@ -1071,6 +1310,11 @@ public final class AiChatBotPluginServer {
     final HttpResponse<String> aiResponse =
         client.send(
             aiRequestBuilder.build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+
+    final String assistantMessage = extractAssistantMessageForHistory(cfg, aiResponse.body());
+    if (aiResponse.statusCode() < 400 && assistantMessage != null && !assistantMessage.isBlank()) {
+      historyStore.append(sessionId, "assistant", assistantMessage);
+    }
 
     final boolean openAiMode = MODE_OPENAI.equalsIgnoreCase(cfg.llmMode);
     if (!openAiMode || !cfg.unwrapAnswer || aiResponse.statusCode() >= 400) {
@@ -1193,6 +1437,7 @@ public final class AiChatBotPluginServer {
   private static String buildOpenAiChatCompletionsBody(
       String model,
       String systemContent,
+      ArrayList<ChatHistoryEntry> history,
       String userContent,
       Double temperature,
       Integer maxTokens) {
@@ -1203,6 +1448,18 @@ public final class AiChatBotPluginServer {
     sb.append("{\"role\":\"system\",\"content\":\"")
         .append(escapeJson(systemContent))
         .append("\"},");
+    if (history != null && !history.isEmpty()) {
+      for (ChatHistoryEntry e : history) {
+        if (!"user".equals(e.role) && !"assistant".equals(e.role)) {
+          continue;
+        }
+        sb.append("{\"role\":\"")
+            .append(escapeJson(e.role))
+            .append("\",\"content\":\"")
+            .append(escapeJson(e.message))
+            .append("\"},");
+      }
+    }
     sb.append("{\"role\":\"user\",\"content\":\"").append(escapeJson(userContent)).append("\"}");
     sb.append("],");
     sb.append("\"stream\":false");
@@ -1378,7 +1635,9 @@ public final class AiChatBotPluginServer {
     exchange.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
     exchange
         .getResponseHeaders()
-        .set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Dremio-Username");
+        .set(
+            "Access-Control-Allow-Headers",
+            "Authorization, Content-Type, X-Dremio-Username, X-Chat-Session-Id");
     exchange.getResponseHeaders().set("Access-Control-Max-Age", "86400");
   }
 
@@ -1595,6 +1854,64 @@ public final class AiChatBotPluginServer {
       this.systemPrompt = systemPrompt;
       this.requestTimeoutSeconds = requestTimeoutSeconds;
       this.unwrapAnswer = unwrapAnswer;
+    }
+  }
+
+  private static final class ChatHistoryStore {
+    private final ConcurrentHashMap<String, ConcurrentLinkedDeque<ChatHistoryEntry>> bySession =
+        new ConcurrentHashMap<>();
+    private final int maxMessagesPerSession;
+
+    ChatHistoryStore(int maxMessagesPerSession) {
+      this.maxMessagesPerSession = Math.max(1, maxMessagesPerSession);
+    }
+
+    ChatHistoryEntry append(String sessionId, String role, String message) {
+      final String sid = sessionId.trim();
+      final ChatHistoryEntry entry =
+          new ChatHistoryEntry(sid, role, message, Instant.now().toString());
+      final ConcurrentLinkedDeque<ChatHistoryEntry> q =
+          bySession.computeIfAbsent(sid, ignored -> new ConcurrentLinkedDeque<>());
+      q.addLast(entry);
+      while (q.size() > maxMessagesPerSession) {
+        q.pollFirst();
+      }
+      return entry;
+    }
+
+    ArrayList<ChatHistoryEntry> read(String sessionId, int limit) {
+      final Deque<ChatHistoryEntry> q = bySession.get(sessionId.trim());
+      if (q == null || q.isEmpty()) {
+        return new ArrayList<>();
+      }
+      final int cap = Math.max(1, limit);
+      final ArrayList<ChatHistoryEntry> out = new ArrayList<>(Math.min(cap, q.size()));
+      for (ChatHistoryEntry e : q) {
+        out.add(e);
+        if (out.size() >= cap) {
+          break;
+        }
+      }
+      return out;
+    }
+
+    int clear(String sessionId) {
+      final ConcurrentLinkedDeque<ChatHistoryEntry> removed = bySession.remove(sessionId.trim());
+      return removed == null ? 0 : removed.size();
+    }
+  }
+
+  private static final class ChatHistoryEntry {
+    final String sessionId;
+    final String role;
+    final String message;
+    final String timestampIso;
+
+    ChatHistoryEntry(String sessionId, String role, String message, String timestampIso) {
+      this.sessionId = sessionId;
+      this.role = role;
+      this.message = message;
+      this.timestampIso = timestampIso;
     }
   }
 }

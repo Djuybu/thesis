@@ -1,8 +1,15 @@
-# Python 3.11+ — stack: LangGraph agent + Ollama + MCP (streamable HTTP via aichatbot mcp-proxy)
+# Python 3.11+ — LangGraph agent + Ollama + MCP + optional RAG (FAISS/PDF) + HTTP tools
 langchain-core>=0.3.41
+langchain-community>=0.3.19
 langgraph>=0.3.12
 langchain-ollama>=0.2.3
 langchain-mcp-adapters>=0.1.7
+langchain-text-splitters>=0.3.4
 mcp>=1.9.2
+redis>=5.2.1
 fastapi>=0.115.0
 uvicorn[standard]>=0.34.0
+httpx>=0.27.0
+python-multipart>=0.0.9
+pypdf>=5.0.0
+faiss-cpu>=1.8.0
