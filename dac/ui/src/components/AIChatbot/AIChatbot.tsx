@@ -40,9 +40,13 @@ const QUICK_PROMPTS = [
   "Giải thích lỗi SQL và đề xuất cách sửa.",
 ];
 
-const pickAnswerText = (payload: ChatApiResponse) => {
-  if (payload.answer && payload.answer.trim()) return payload.answer;
-  if (payload.error) return `Lỗi: ${payload.error}`;
+const pickAnswerText = (payload: AskResponse) => {
+  const candidates = [payload.response, payload.answer, payload.content];
+  for (const value of candidates) {
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value;
+    }
+  }
   return "AI không trả về nội dung.";
 };
 
@@ -75,10 +79,6 @@ export const AIChatbot = () => {
   const [toast, setToast] = useState("");
   const [historyFilter, setHistoryFilter] = useState("");
   const [lastPrompt, setLastPrompt] = useState("");
-  const [lastLatencyMs, setLastLatencyMs] = useState<number | null>(null);
-  const [connectionStatus, setConnectionStatus] = useState<
-    "idle" | "loading" | "ok" | "error"
-  >("idle");
   const [codeWrap, setCodeWrap] = useState(false);
   const [pendingInterrupt, setPendingInterrupt] =
     useState<HitlInterrupt | null>(null);
@@ -121,19 +121,17 @@ export const AIChatbot = () => {
     inputEl.style.height = `${Math.min(inputEl.scrollHeight, 180)}px`;
   }, [input]);
 
-  const persistSessions = (nextSessions: ChatSession[]) => {
-    setSessions(nextSessions);
-    chatService.saveSessions(nextSessions);
-  };
-
   const updateSession = (
     sessionId: string,
     updater: (session: ChatSession) => ChatSession,
   ) => {
-    const nextSessions = sessions.map((session) =>
-      session.id === sessionId ? updater(session) : session,
-    );
-    persistSessions(nextSessions);
+    setSessions((prev) => {
+      const next = prev.map((session) =>
+        session.id === sessionId ? updater(session) : session,
+      );
+      chatService.saveSessions(next);
+      return next;
+    });
   };
 
   const appendMessage = (sessionId: string, message: ChatMessage) => {
@@ -166,8 +164,11 @@ export const AIChatbot = () => {
 
   const onCreateSession = () => {
     const session = createSession();
-    const nextSessions = [session, ...sessions];
-    persistSessions(nextSessions);
+    setSessions((prev) => {
+      const next = [session, ...prev];
+      chatService.saveSessions(next);
+      return next;
+    });
     setActiveSessionId(session.id);
     setPendingInterrupt(null);
     setPendingThreadId(null);
@@ -268,9 +269,7 @@ export const AIChatbot = () => {
     }
 
     setError("");
-    setConnectionStatus("loading");
     setLastPrompt(value);
-    const startedAt = Date.now();
     const requestController = new AbortController();
     requestControllerRef.current = requestController;
 
@@ -290,13 +289,23 @@ export const AIChatbot = () => {
         activeSession.threadId,
         requestController.signal,
       );
-      handleApiResponse(payload);
+      const raw = pickAnswerText(payload);
+      const dataRows: DataRow[] = Array.isArray(payload.data)
+        ? payload.data
+        : [];
+      const aiMessage: ChatMessage = {
+        id: uid(),
+        role: "assistant",
+        raw,
+        parsed: parseMessageContent(raw, dataRows),
+        createdAt: Date.now(),
+      };
+      appendMessage(activeSession.id, aiMessage);
     } catch (e) {
       const isAbort =
         e instanceof DOMException && e.name.toLowerCase() === "aborterror";
       if (isAbort) {
         setError("Đã dừng tạo phản hồi.");
-        setConnectionStatus("idle");
         return;
       }
       const rawMsg = e instanceof Error ? e.message : "Không rõ lỗi";
@@ -314,10 +323,8 @@ export const AIChatbot = () => {
         parsed: parseMessageContent(`Lỗi khi gọi AI: ${msg}`),
         createdAt: Date.now(),
       });
-      setConnectionStatus("error");
     } finally {
       requestControllerRef.current = null;
-      setLastLatencyMs(Date.now() - startedAt);
       setIsTyping(false);
     }
   };
@@ -397,29 +404,8 @@ export const AIChatbot = () => {
           >
             <div className={classes.chat}>
               <header className={classes.header}>
-                <div>
-                  <div className={classes.headerTitle}>AI Chatbot</div>
-                  <div className={classes.metaRow}>
-                    <span className={classes.badge}>Model: default</span>
-                    <span className={classes.badge}>
-                      Phiên: {activeSession.title}
-                    </span>
-                    <span className={classes.badge}>
-                      Latency: {lastLatencyMs ? `${lastLatencyMs}ms` : "N/A"}
-                    </span>
-                    <span className={classes.badge}>
-                      API: {connectionStatus}
-                    </span>
-                  </div>
-                </div>
+                <div className={classes.headerTitle}>AI Chatbot</div>
                 <div className={classes.headerActions}>
-                  <button
-                    className={classes.btn}
-                    onClick={() => void askAI(lastPrompt)}
-                    disabled={isTyping || !lastPrompt || !loggedIn}
-                  >
-                    Retry
-                  </button>
                   {isTyping && (
                     <button className={classes.btn} onClick={stopGenerating}>
                       Dừng
@@ -544,8 +530,19 @@ export const AIChatbot = () => {
                         <>
                           <button
                             className={classes.linkBtn}
-                            onClick={() => void askAI(lastPrompt)}
-                            disabled={isTyping || !lastPrompt || !loggedIn}
+                            onClick={() => {
+                              void askAI(lastPrompt);
+                            }}
+                            disabled={isTyping || !lastPrompt}
+                          >
+                            Retry
+                          </button>
+                          <button
+                            className={classes.linkBtn}
+                            onClick={() => {
+                              void askAI(lastPrompt);
+                            }}
+                            disabled={isTyping || !lastPrompt}
                           >
                             Regenerate
                           </button>
@@ -555,7 +552,7 @@ export const AIChatbot = () => {
                               message.feedback === "up" &&
                                 classes.linkBtnActive,
                             )}
-                            onClick={() =>
+                            onClick={() => {
                               setMessageFeedback(
                                 activeSession.id,
                                 message.id,
@@ -571,7 +568,7 @@ export const AIChatbot = () => {
                               message.feedback === "down" &&
                                 classes.linkBtnActive,
                             )}
-                            onClick={() =>
+                            onClick={() => {
                               setMessageFeedback(
                                 activeSession.id,
                                 message.id,
@@ -586,7 +583,9 @@ export const AIChatbot = () => {
                       {message.role === "user" && (
                         <button
                           className={classes.linkBtn}
-                          onClick={() => setInput(message.raw)}
+                          onClick={() => {
+                            setInput(message.raw);
+                          }}
                         >
                           Edit prompt
                         </button>
@@ -654,58 +653,27 @@ export const AIChatbot = () => {
                     </button>
                   </div>
                 </div>
-              )}
-
-              {!loggedIn && (
-                <div className={classes.errorText}>
-                  Đăng nhập Dremio để gửi câu hỏi tới AI.
-                </div>
-              )}
-              {error && <div className={classes.errorText}>{error}</div>}
-              {toast && <div className={classes.toast}>{toast}</div>}
-
-              {/* Normal input bar (hidden when HITL is pending) */}
-              {!pendingInterrupt && (
-                <footer className={classes.inputBar}>
-                  <div className={classes.inputColumn}>
-                    <textarea
-                      ref={inputRef}
-                      className={classes.input}
-                      value={input}
-                      rows={3}
-                      placeholder="Nhập câu hỏi..."
-                      onChange={(e) => setInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey) {
-                          e.preventDefault();
-                          void askAI();
-                        }
-                      }}
-                    />
-                    <div className={classes.inputMeta}>
-                      <span
-                        className={clsx(
-                          input.length >= SOFT_PROMPT_LIMIT && classes.warnText,
-                        )}
-                      >
-                        {input.length}/{MAX_PROMPT_LENGTH}
-                      </span>
-                      {input.length >= SOFT_PROMPT_LIMIT && (
-                        <span className={classes.warnText}>
-                          Prompt dài, có thể tăng độ trễ.
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <button
-                    className={clsx(classes.btn, classes.primaryBtn)}
-                    onClick={() => void askAI()}
-                    disabled={isTyping || !input.trim() || !loggedIn}
+                <button
+                  type="button"
+                  className={clsx(classes.btn, classes.sendIconBtn)}
+                  aria-label="Gửi"
+                  title="Gửi"
+                  onClick={() => void askAI()}
+                  disabled={isTyping || !input.trim()}
+                >
+                  <svg
+                    className={classes.sendIcon}
+                    viewBox="0 0 24 24"
+                    aria-hidden
+                    focusable="false"
                   >
-                    Send
-                  </button>
-                </footer>
-              )}
+                    <path
+                      fill="currentColor"
+                      d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.59 5.58L20 12l-8-8-8 8z"
+                    />
+                  </svg>
+                </button>
+              </footer>
             </div>
             <aside className={classes.history}>
               <div className={classes.historyHeader}>
