@@ -21,7 +21,16 @@ from __future__ import annotations
 import os
 
 # Single default for gateway + `/aichat/v1/config` when `OLLAMA_MODEL` is unset.
-DEFAULT_OLLAMA_MODEL = "qwen3.5:4b"
+# Was ``qwen3.5:4b`` — but Qwen 3.5 runs in "thinking" mode by default and
+# Ollama emits ~thousands of reasoning tokens before any JSON content for
+# ``with_structured_output`` calls, causing ``sql_gen_node`` to time out even
+# after 900s on CPU (verified via direct Ollama probe: only 200 of 200 tokens
+# went into ``thinking``, ``content`` stayed empty). ``langchain-ollama`` 0.3.0
+# has no pass-through for Ollama's ``think: false`` request body field, so we
+# pick ``qwen2.5:3b`` (no reasoning mode) which produces valid structured SQL
+# in ~11s on the same hardware. Users with a GPU can override via the
+# ``OLLAMA_MODEL`` env var.
+DEFAULT_OLLAMA_MODEL = "qwen2.5:3b"
 
 
 def env(name: str, default: str = "") -> str:

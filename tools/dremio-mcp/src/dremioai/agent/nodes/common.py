@@ -14,14 +14,22 @@ _AGENT_DEBUG_LOG_PATH = "/home/djuybu/thesis/.cursor/debug-70b267.log"
 
 
 def structured_llm_timeout_seconds() -> float | None:
-    """Cap for Ollama ``with_structured_output`` calls; unset/0 = unlimited."""
-    raw = os.environ.get("AGENT_STRUCTURED_LLM_TIMEOUT_SECONDS", "120").strip().lower()
+    """Cap for Ollama ``with_structured_output`` calls; unset/0 = unlimited.
+
+    Default is 900 seconds. Larger Qwen builds (e.g. qwen3.5:4b) running on
+    CPU can take 2-5 minutes to emit JSON conforming to a Pydantic schema;
+    a too-small cap surfaces as ``asyncio.TimeoutError`` whose empty ``str()``
+    repr produces a silent ``"SQL generation failed: "`` error from
+    ``sql_gen_node``. The default LLM ``qwen2.5:3b`` typically completes in
+    10-30s, so 900s is purely defensive.
+    """
+    raw = os.environ.get("AGENT_STRUCTURED_LLM_TIMEOUT_SECONDS", "900").strip().lower()
     if not raw or raw in ("0", "false", "no", "off", "none"):
         return None
     try:
         v = float(raw)
     except ValueError:
-        return 120.0
+        return 900.0
     return v if v > 0 else None
 
 

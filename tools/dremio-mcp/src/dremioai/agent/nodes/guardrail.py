@@ -13,6 +13,7 @@ from dremioai.agent.nodes.common import (
 )
 from dremioai.agent.state import AgentState
 
+
 _GREETING_RE = re.compile(
     r"^\s*(hello|hi|hey|xin chao|chao|good morning|good afternoon|good evening)\s*[!.?]*\s*$",
     re.IGNORECASE,
