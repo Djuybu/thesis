@@ -1,0 +1,3 @@
+# Real PAT/secret-bearing files — keep only the .example checked in.
+.env
+mcp-oss.yaml

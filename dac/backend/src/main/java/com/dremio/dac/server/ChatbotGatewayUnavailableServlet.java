@@ -25,10 +25,10 @@ import javax.servlet.http.HttpServletResponse;
  * Served at {@code /aichat/*} when no gateway base URL is configured, so the SPA fallback ({@code
  * /*}) does not return HTML for API paths.
  */
-public final class AiChatbotPluginUnavailableServlet extends HttpServlet {
+public final class ChatbotGatewayUnavailableServlet extends HttpServlet {
 
   private static final String JSON =
-      "{\"error\":\"AI SQL Agent gateway is not configured. Set services.coordinator.web.aichatbot.plugin.base_url in dremio.conf, or environment variable DREMIO_AICHATBOT_PLUGIN_BASE_URL, or system property dremio.aichatbot.plugin.base_url (e.g. http://127.0.0.1:9292), then restart Dremio.\"}";
+      "{\"error\":\"AI SQL Agent gateway is not configured. Set services.coordinator.web.chatbot.gateway.base_url in dremio.conf, or environment variable DREMIO_CHATBOT_GATEWAY_BASE_URL, or system property dremio.chatbot.gateway.base_url (e.g. http://127.0.0.1:9292), then restart Dremio. The legacy keys services.coordinator.web.aichatbot.plugin.base_url / DREMIO_AICHATBOT_PLUGIN_BASE_URL are still accepted.\"}";
 
   @Override
   protected void service(HttpServletRequest req, HttpServletResponse resp) throws IOException {

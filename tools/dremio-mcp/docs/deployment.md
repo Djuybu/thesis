@@ -19,8 +19,8 @@ DAC UI  →  DAC Backend (/aichat/* proxy)  →  SQL Agent Gateway (port 9292)
 ## Prerequisites
 
 - **Python 3.11 or newer** (required by `dremioai` and `beeai-framework`). On Python 3.10, `pip install` fails with `No matching distribution found for beeai-framework` — upgrade Python or use `uv python install 3.12`.
-- Use a **separate venv under `tools/dremio-mcp`** (do not reuse `tools/aichatbot-plugin/langchain-gateway/.venv`).
-- Ollama with a chat model pulled (e.g. `ollama pull qwen3.5:4b`)
+- Use a **separate venv under `tools/dremio-mcp`** (the old `tools/aichatbot-plugin/langchain-gateway/.venv` was removed when the legacy plugin was deleted).
+- Ollama with a chat model pulled (e.g. `ollama pull qwen2.5:3b`)
 - Dremio running (port 9047)
 - dremio-mcp server running with `--enable-streaming-http`
 
@@ -96,7 +96,10 @@ curl -X POST http://127.0.0.1:9292/aichat/v1/chat/resume \
 
 ## Rollback Procedure
 
-If the new gateway has issues, switch back to the legacy plugin temporarily:
+The legacy `tools/aichatbot-plugin/` (Java JAR + `langchain-gateway/`) has been
+removed from the tree. To roll back to it, restore the directory from git
+history (e.g. `git checkout <commit-before-deletion> -- tools/aichatbot-plugin`),
+rebuild the JAR, then:
 
 1. Update `conf/dremio.conf`:
    ```

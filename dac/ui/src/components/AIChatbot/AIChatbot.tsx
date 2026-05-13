@@ -40,13 +40,9 @@ const QUICK_PROMPTS = [
   "Giải thích lỗi SQL và đề xuất cách sửa.",
 ];
 
-const pickAnswerText = (payload: AskResponse) => {
-  const candidates = [payload.response, payload.answer, payload.content];
-  for (const value of candidates) {
-    if (typeof value === "string" && value.trim().length > 0) {
-      return value;
-    }
-  }
+const pickAnswerText = (payload: ChatApiResponse) => {
+  if (payload.answer && payload.answer.trim()) return payload.answer;
+  if (payload.error) return `Lỗi: ${payload.error}`;
   return "AI không trả về nội dung.";
 };
 
@@ -222,7 +218,6 @@ export const AIChatbot = () => {
         parsed: parseMessageContent(raw),
         createdAt: Date.now(),
       });
-      setConnectionStatus("ok");
     } else if (payload.status === "completed") {
       setPendingInterrupt(null);
       setPendingThreadId(null);
@@ -237,7 +232,6 @@ export const AIChatbot = () => {
         parsed: parseMessageContent(raw, dataRows),
         createdAt: Date.now(),
       });
-      setConnectionStatus("ok");
     } else {
       setPendingInterrupt(null);
       setPendingThreadId(null);
@@ -249,7 +243,6 @@ export const AIChatbot = () => {
         parsed: parseMessageContent(raw),
         createdAt: Date.now(),
       });
-      setConnectionStatus("error");
     }
   };
 
@@ -260,7 +253,6 @@ export const AIChatbot = () => {
     if (!value) return;
     if (!hasAuthToken()) {
       setError("Cần đăng nhập Dremio để dùng AI Chat.");
-      setConnectionStatus("error");
       return;
     }
     if (value.length > MAX_PROMPT_LENGTH) {
@@ -289,18 +281,7 @@ export const AIChatbot = () => {
         activeSession.threadId,
         requestController.signal,
       );
-      const raw = pickAnswerText(payload);
-      const dataRows: DataRow[] = Array.isArray(payload.data)
-        ? payload.data
-        : [];
-      const aiMessage: ChatMessage = {
-        id: uid(),
-        role: "assistant",
-        raw,
-        parsed: parseMessageContent(raw, dataRows),
-        createdAt: Date.now(),
-      };
-      appendMessage(activeSession.id, aiMessage);
+      handleApiResponse(payload);
     } catch (e) {
       const isAbort =
         e instanceof DOMException && e.name.toLowerCase() === "aborterror";
@@ -332,9 +313,7 @@ export const AIChatbot = () => {
   const handleHitlAction = async (action: "approve" | "reject" | "edit") => {
     if (!pendingThreadId || !activeSession) return;
     setIsTyping(true);
-    setConnectionStatus("loading");
     setError("");
-    const startedAt = Date.now();
 
     const actionLabel =
       action === "approve"
@@ -360,9 +339,7 @@ export const AIChatbot = () => {
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Không rõ lỗi";
       setError(`Lỗi resume: ${msg}`);
-      setConnectionStatus("error");
     } finally {
-      setLastLatencyMs(Date.now() - startedAt);
       setIsTyping(false);
     }
   };
@@ -557,8 +534,8 @@ export const AIChatbot = () => {
                                 activeSession.id,
                                 message.id,
                                 "up",
-                              )
-                            }
+                              );
+                            }}
                           >
                             Like
                           </button>
@@ -573,8 +550,8 @@ export const AIChatbot = () => {
                                 activeSession.id,
                                 message.id,
                                 "down",
-                              )
-                            }
+                              );
+                            }}
                           >
                             Dislike
                           </button>
@@ -653,27 +630,71 @@ export const AIChatbot = () => {
                     </button>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  className={clsx(classes.btn, classes.sendIconBtn)}
-                  aria-label="Gửi"
-                  title="Gửi"
-                  onClick={() => void askAI()}
-                  disabled={isTyping || !input.trim()}
-                >
-                  <svg
-                    className={classes.sendIcon}
-                    viewBox="0 0 24 24"
-                    aria-hidden
-                    focusable="false"
-                  >
-                    <path
-                      fill="currentColor"
-                      d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.59 5.58L20 12l-8-8-8 8z"
+              )}
+
+              {!loggedIn && (
+                <div className={classes.errorText}>
+                  Đăng nhập Dremio để gửi câu hỏi tới AI.
+                </div>
+              )}
+              {error && <div className={classes.errorText}>{error}</div>}
+              {toast && <div className={classes.toast}>{toast}</div>}
+
+              {/* Normal input bar (hidden when HITL is pending) */}
+              {!pendingInterrupt && (
+                <footer className={classes.inputBar}>
+                  <div className={classes.inputColumn}>
+                    <textarea
+                      ref={inputRef}
+                      className={classes.input}
+                      value={input}
+                      rows={3}
+                      placeholder="Nhập câu hỏi..."
+                      onChange={(e) => setInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          void askAI();
+                        }
+                      }}
                     />
-                  </svg>
-                </button>
-              </footer>
+                    <div className={classes.inputMeta}>
+                      <span
+                        className={clsx(
+                          input.length >= SOFT_PROMPT_LIMIT && classes.warnText,
+                        )}
+                      >
+                        {input.length}/{MAX_PROMPT_LENGTH}
+                      </span>
+                      {input.length >= SOFT_PROMPT_LIMIT && (
+                        <span className={classes.warnText}>
+                          Prompt dài, có thể tăng độ trễ.
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className={clsx(classes.btn, classes.sendIconBtn)}
+                    aria-label="Gửi"
+                    title="Gửi"
+                    onClick={() => void askAI()}
+                    disabled={isTyping || !input.trim() || !loggedIn}
+                  >
+                    <svg
+                      className={classes.sendIcon}
+                      viewBox="0 0 24 24"
+                      aria-hidden
+                      focusable="false"
+                    >
+                      <path
+                        fill="currentColor"
+                        d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.59 5.58L20 12l-8-8-8 8z"
+                      />
+                    </svg>
+                  </button>
+                </footer>
+              )}
             </div>
             <aside className={classes.history}>
               <div className={classes.historyHeader}>

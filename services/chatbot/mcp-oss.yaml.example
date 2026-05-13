@@ -1,0 +1,12 @@
+# services/chatbot — sample MCP server config for Dremio OSS.
+# Copy to `mcp-oss.yaml` (gitignored) and fill in your own `uri` + `pat`.
+
+dremio:
+  uri: http://localhost:9047
+  pat: REPLACE_WITH_DREMIO_PAT
+  # Required for the SQL agent's discovery step (SearchTableAndViews tool).
+  enable_search: true
+
+tools:
+  # FOR_DATA_PATTERNS keeps the agent focused on user-facing data discovery.
+  server_mode: FOR_DATA_PATTERNS

@@ -83,8 +83,19 @@ public class DremioConfig extends NestedConfig {
   /**
    * Base URL of the Dremio SQL Agent gateway (e.g. {@code http://127.0.0.1:9292}). Empty =
    * disabled; DAC returns 503 for {@code /aichat/*}. Override with {@code
-   * DREMIO_AICHATBOT_PLUGIN_BASE_URL} or {@code -Ddremio.aichatbot.plugin.base_url=...}.
+   * DREMIO_CHATBOT_GATEWAY_BASE_URL} or {@code -Ddremio.chatbot.gateway.base_url=...}.
    */
+  public static final String WEB_CHATBOT_GATEWAY_BASE_URL =
+      "services.coordinator.web.chatbot.gateway.base_url";
+
+  /**
+   * Legacy alias for {@link #WEB_CHATBOT_GATEWAY_BASE_URL}. The resolver still reads this key so
+   * existing {@code dremio.conf} files keep working, but new deployments should use the
+   * non-deprecated key above.
+   *
+   * @deprecated Use {@link #WEB_CHATBOT_GATEWAY_BASE_URL}.
+   */
+  @Deprecated
   public static final String WEB_AICHATBOT_PLUGIN_BASE_URL =
       "services.coordinator.web.aichatbot.plugin.base_url";
 

@@ -1,6 +1,6 @@
 dremio:
     uri: http://localhost:9047
-    pat: 7smk86r7pfig854sg2d0p47bdh
+    pat: trdcslml38h61c0gjptlbt6p91
     # Bật công cụ thử nghiệm SearchTableAndViews (bắt buộc cho SQL agent discovery)
     enable_search: true
 tools:

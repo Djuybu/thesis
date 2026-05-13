@@ -37,7 +37,7 @@ import javax.servlet.http.HttpServletResponse;
  * Reverse-proxies {@code /aichat/*} to the Dremio SQL Agent gateway (dremio-sql-agent), preserving
  * client headers needed for Dremio auth and MCP (including SSE streams for GET).
  */
-public final class AiChatbotPluginProxyServlet extends HttpServlet {
+public final class ChatbotGatewayProxyServlet extends HttpServlet {
 
   private static final Set<String> HOP_BY_HOP =
       Set.of(
@@ -66,13 +66,17 @@ public final class AiChatbotPluginProxyServlet extends HttpServlet {
   private static final int BUFFER = 8192;
 
   /**
-   * Default wait for buffered POST/PUT to the plugin (e.g. /aichat/ask + LangChain + MCP). Override
-   * with servlet init-param {@code bufferTimeoutSeconds} or {@code
-   * -Ddremio.aichatbot.plugin.proxy.buffer_timeout_seconds=...} (seconds, clamped 60–864000).
+   * Default wait for buffered POST/PUT to the gateway (e.g. /aichat/ask + LangChain + MCP).
+   * Override with servlet init-param {@code bufferTimeoutSeconds} or {@code
+   * -Ddremio.chatbot.gateway.proxy.buffer_timeout_seconds=...} (seconds, clamped 60–864000). The
+   * legacy property {@code dremio.aichatbot.plugin.proxy.buffer_timeout_seconds} is still honoured
+   * for backward compatibility.
    */
   private static final int DEFAULT_BUFFER_TIMEOUT_SECONDS = 86_400;
 
   private static final String BUFFER_TIMEOUT_SYS_PROP =
+      "dremio.chatbot.gateway.proxy.buffer_timeout_seconds";
+  private static final String LEGACY_BUFFER_TIMEOUT_SYS_PROP =
       "dremio.aichatbot.plugin.proxy.buffer_timeout_seconds";
 
   private transient String baseUrl;
@@ -86,7 +90,7 @@ public final class AiChatbotPluginProxyServlet extends HttpServlet {
     if (Strings.isNullOrEmpty(p)) {
       throw new ServletException("init-param targetBaseUrl is required");
     }
-    this.baseUrl = AiChatbotPluginBaseUrlResolver.stripTrailingSlash(p.trim());
+    this.baseUrl = ChatbotGatewayBaseUrlResolver.stripTrailingSlash(p.trim());
     this.bufferedRequestTimeout = Duration.ofSeconds(resolveBufferedTimeoutSeconds());
     this.httpClient =
         HttpClient.newBuilder()
@@ -99,6 +103,9 @@ public final class AiChatbotPluginProxyServlet extends HttpServlet {
     String raw = getServletConfig().getInitParameter("bufferTimeoutSeconds");
     if (raw == null || raw.isBlank()) {
       raw = System.getProperty(BUFFER_TIMEOUT_SYS_PROP);
+    }
+    if (raw == null || raw.isBlank()) {
+      raw = System.getProperty(LEGACY_BUFFER_TIMEOUT_SYS_PROP);
     }
     if (raw == null || raw.isBlank()) {
       return DEFAULT_BUFFER_TIMEOUT_SECONDS;
@@ -134,7 +141,7 @@ public final class AiChatbotPluginProxyServlet extends HttpServlet {
       }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
-      throw new ServletException("Interrupted while proxying to aichatbot plugin", e);
+      throw new ServletException("Interrupted while proxying to chatbot gateway", e);
     }
   }
 

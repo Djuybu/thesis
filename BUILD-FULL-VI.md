@@ -92,11 +92,14 @@ Các **module Maven** chính trong `pom.xml` gốc:
 
 ---
 
-## 4. Dremio SQL Agent Gateway (thay thế aichatbot-plugin)
+## 4. Dremio SQL Agent Gateway (đã thay thế plugin Java cũ)
 
-Hướng dẫn chạy từng bước (tiếng Việt): **[tools/dremio-mcp/docs/RUN-VI.md](tools/dremio-mcp/docs/RUN-VI.md)**.
+Hướng dẫn chạy từng bước (tiếng Việt): **[tools/dremio-mcp/docs/RUN-VI.md](tools/dremio-mcp/docs/RUN-VI.md)**
+hoặc bản gọn dùng wrapper: **[services/chatbot/README.md](services/chatbot/README.md)**.
 
-Gateway mới nằm trong **`tools/dremio-mcp`** (Python, không phải Maven module).
+Gateway nằm trong **`tools/dremio-mcp`** (Python, không phải Maven module).
+Thư mục `tools/aichatbot-plugin/` cũ (JAR + langchain-gateway) đã bị xoá khỏi
+cây — nếu cần rollback, lấy từ git history.
 
 ### Cài đặt
 
@@ -109,12 +112,16 @@ pip install -e .
 ### Chạy gateway
 
 ```bash
+# Cách gọn (đọc services/chatbot/.env):
+services/chatbot/run-gateway.sh
+
+# Hoặc trực tiếp (sau khi activate venv ở tools/dremio-mcp):
 # Cần Ollama chạy sẵn (mặc định port 11434)
 # Cần dremio-mcp server chạy ở port 8080
 dremio-sql-agent
 ```
 
-Hoặc trực tiếp:
+Hoặc gọi module Python trực tiếp:
 
 ```bash
 python -m dremioai.gateway.app
@@ -126,7 +133,7 @@ Gateway mặc định chạy tại **http://127.0.0.1:9292** (cấu hình qua `G
 
 | Biến | Mặc định | Ghi chú |
 |------|----------|---------|
-| `OLLAMA_MODEL` | `qwen3.5:4b` | Ollama model id |
+| `OLLAMA_MODEL` | `qwen2.5:3b` | Ollama model id (Qwen 3.x bật "thinking" có thể timeout với CPU) |
 | `OLLAMA_BASE_URL` | `http://127.0.0.1:11434` | Ollama API |
 | `DREMIO_MCP_URL` | `http://127.0.0.1:8080/mcp/` | Dremio MCP HTTP endpoint |
 | `GATEWAY_HOST` | `127.0.0.1` | Gateway bind host |
@@ -155,11 +162,11 @@ Cấu hình: [tools/dremio-mcp/local/mcp-oss.yaml](tools/dremio-mcp/local/mcp-os
 
 ## 6. Triển khai end-to-end
 
-Thứ tự khởi động:
+Thứ tự khởi động (gợi ý dùng wrapper trong `services/chatbot/`):
 1. **Dremio** (port 9047)
-2. **Ollama** (port 11434) — `ollama serve` + `ollama pull qwen3.5:4b`
-3. **dremio-mcp server** (port 8080) — `cd tools/dremio-mcp && uv run dremio-mcp-server run -c local/mcp-oss.yaml --enable-streaming-http --port 8080`
-4. **SQL Agent gateway** (port 9292) — `dremio-sql-agent`
+2. **Ollama** (port 11434) — `ollama serve` + `ollama pull qwen2.5:3b`
+3. **dremio-mcp server** (port 8080) — `services/chatbot/run-mcp.sh` (hoặc gọi trực tiếp `cd tools/dremio-mcp && uv run dremio-mcp-server run -c local/mcp-oss.yaml --enable-streaming-http --port 8080`)
+4. **SQL Agent gateway** (port 9292) — `services/chatbot/run-gateway.sh` (hoặc `dremio-sql-agent`)
 
 Cấu hình Dremio: `conf/dremio.conf` → `services.coordinator.web.aichatbot.plugin.base_url = "http://127.0.0.1:9292"`
 
