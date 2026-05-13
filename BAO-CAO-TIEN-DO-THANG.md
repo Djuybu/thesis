@@ -3,6 +3,9 @@
 **Branch:** `aichatbot-merge` · **Repository:** `Djuybu/thesis`
 
 Báo cáo tóm tắt 3 hạng mục công việc đã thực hiện trong tháng:
+"""
+Thêm tên thành viên (Thành viên nào làm tính năng gì?)
+"""
 
 1. Giao diện cho Chatbot (UI)
 2. Backend logic cho LLM (LangGraph)
@@ -18,35 +21,27 @@ Xây dựng widget chat AI nhúng trực tiếp vào Dremio Analyst Center (DAC)
 
 ### 1.2 Công việc đã thực hiện
 
-**Vị trí code:** `dac/ui/src/components/AIChatbot/` (7 file, ~1100 dòng).
+**Vị trí code:** `dac/ui/src/components/AIChatbot/`.
+(Bỏ bảng file | vai trò đi)
 
-| File | Vai trò |
-|------|---------|
-| `AIChatbot.tsx` | Component React chính (~815 dòng) |
-| `AIChatbot.module.less` | Styling CSS Module, dark/light theme |
-| `chatService.ts` | Fetch wrapper + lưu `localStorage` |
-| `parser.ts` | Markdown → HTML sanitized + tách SQL block |
-| `types.ts` | TypeScript types |
-| `chatService-spec.js`, `parser-spec.js` | Unit tests |
 
-**Stack:** React 18, TypeScript, `marked` (Markdown), `dompurify` (XSS sanitize), `clsx`.
+**Stack:** React 18 + TypeScript, sử dụng prettier để format
 
-**Tính năng đã hoàn thành:**
+**Tính năng đã hoàn thành (A tự viết lại phần này cho giống người viết hơn giúp em với + chèn thêm ảnh):**
+
 
 - Nút FAB nổi góc dưới phải, mở modal panel 1280×800px (responsive).
 - Bố cục 2 cột: khung chat + sidebar lịch sử.
 - **Quản lý phiên hội thoại**: tạo mới, ghim, đổi tên, tìm kiếm, lưu `localStorage`.
 - **Human-in-the-loop**: 2 lần phê duyệt — metadata + SQL. Có nút **Approve / Edit & Run / Reject**.
-- **Render an toàn**: Markdown → `marked` → `DOMPurify.sanitize` → `dangerouslySetInnerHTML`.
-- Auto-scroll, auto-resize textarea, đếm ký tự (limit 2000), abort request, retry, regenerate.
+
 - Quick prompts gợi ý cho phiên mới.
 - Like/Dislike, Copy, Edit prompt, Run SQL (đẩy sang `/new_query`).
 - Badge metadata thời gian thực: Model, Phiên, Latency, API status.
-- Quốc tế hoá tiếng Việt.
 
-**Tích hợp UI:** một dòng tại `dac/ui/src/AdditionalAppElements.tsx`.
+**Tích hợp UI:** tại `dac/ui/src/AdditionalAppElements.tsx`.
 
-### 1.3 Khó khăn
+### 1.3 Vấn đề còn tồn tại
 
 - `AIChatbot.tsx` 815 dòng, monolithic — cần tách `<MessageList>`, `<InputBar>`, `<HistoryPanel>`.
 - `localStorage` không scale khi sessions >1000 message.
@@ -57,8 +52,6 @@ Xây dựng widget chat AI nhúng trực tiếp vào Dremio Analyst Center (DAC)
 - Refactor tách sub-component.
 - Thêm SSE streaming hiển thị token theo thời gian thực.
 - Lưu feedback Like/Dislike lên backend (hiện chỉ local).
-
-> Chi tiết kỹ thuật: xem `BAO-CAO-UI-CHATBOT.md`.
 
 ---
 
@@ -105,7 +98,7 @@ START → guardrail
                                          └→ execute → finalize → END
 ```
 
-**Tính năng đã hoàn thành:**
+**Tính năng đã hoàn thành (Tương tự, a tự viết lại giúp em. Tạm thời viết đơn giản cho mấy tính năng: LLM đã đưa ra phản hồi, có thể chọn đúng bảng, biết từ chối yêu cầu vô lý...):**
 
 - **Guardrail 3 lớp** (regex GREETING → regex DATA_SAFE → LLM classify) — tránh 70-80% gọi LLM.
 - **Discovery thông minh**: list sources qua REST `/apiv2/sources`, catalog search qua MCP, fallback theo dataset token (`NYC-taxi.csv` → `NYC-taxi` → `NYC`).
@@ -117,7 +110,7 @@ START → guardrail
 - **Gateway FastAPI**: 3 endpoint `/aichat/v1/{config,chat,chat/resume}`, pass-through PAT user → MCP (đảm bảo phân quyền do Dremio kiểm soát).
 - **Stream collector**: gộp `astream(stream_mode="updates")` thành 1 state, bắt `__interrupt__` chunk.
 
-### 2.3 Khó khăn
+### 2.3 Vấn đề còn tồn tại
 
 - `InMemorySaver` mất state khi restart gateway → cần Postgres saver cho production.
 - `build_graph` mỗi request tốn ~10-50ms.
@@ -159,31 +152,13 @@ Tự động **đề xuất `dimension` / `measure`** cho Dremio Reflection (k�
 | **Inference (đề xuất)** | Khi `ReflectionSuggester.getAggReflections()` chạy | `POST /predict/schema` |
 | **Ingest (học)** | Định kỳ 5 phút trên coordinator-master | `POST /knowledge/ingest` |
 
-**Tính năng đã hoàn thành:**
-
-- Class `ReflectionBrain`: encode tên cột bằng `all-MiniLM-L6-v2`, knowledge base `{col: {dim_score, mea_score, embedding}}`, cosine similarity threshold 0.7.
-- **Load model 1 lần** qua FastAPI `lifespan`; fix bug `AttributeError: ReflectionBrain` (xem `traceback.txt`) bằng `setattr(sys.modules['__main__'], ...)`.
-- 3 endpoint: `/health`, `/predict/schema` (+ fallback heuristic theo type khi model chưa load), `/knowledge/ingest` (+ token auth, idempotent theo `batchId`).
-- Java `AutonomousReflectionIngestTask` (323 dòng): đọc `JobsService`, regex trích cột từ SQL (`SELECT/WHERE/GROUP BY/AGG()`), POST batch mỗi 5 phút, **clustered singleton**.
-- Java `AutonomousReflectionClient`: gọi `/predict/schema`, **rewrite `AVG → SUM + COUNT`** (Dremio Reflection không lưu AVG trực tiếp), **fail-soft** rơi về heuristic cũ nếu service down.
-- Cấu hình `services.autonomous-reflection.ingest.*` trong `dremio.conf` + 4 hằng `DremioConfig.java`.
-- 11 unit test (7 ingest + 4 predict/simulation) — all pass.
-- `DEPLOYMENT.md` 240 dòng — hướng dẫn end-to-end tiếng Việt.
-
-**Heuristic ingest** (ánh xạ usage → score):
-
-| Cột xuất hiện trong | Tín hiệu | Cộng vào |
-|---------------------|----------|----------|
-| `SELECT` (projection), `WHERE` (filter), `GROUP BY` | dim_signal | `dim_score` |
-| `SUM/AVG/COUNT(col)` | mea_signal | `mea_score` |
+**Tính năng đã hoàn thành (Cái này để em viết):**
 
 ### 3.3 Khó khăn
 
 - **Regex SQL parser** không xử lý subquery / CTE / alias lồng → nên thay bằng Calcite parser của Dremio.
 - **In-memory `_processed_batches`** mất idempotency 5 phút đầu sau restart.
 - **Threshold cosine 0.7 hard-code** — chưa cross-validate.
-- **`_build_embeddings()`** rebuild toàn bộ mỗi ingest — O(N) embedding call.
-- **URL `http://localhost:8000`** hard-code trong `AutonomousReflectionClient.java` — chưa đọc từ `DremioConfig`.
 - `all-MiniLM-L6-v2` chỉ tốt với tên cột tiếng Anh.
 
 ### 3.4 Kế hoạch tiếp theo
@@ -192,7 +167,6 @@ Tự động **đề xuất `dimension` / `measure`** cho Dremio Reflection (k�
 - Persist `_processed_batches` ra Redis/file.
 - Đọc URL service từ `DremioConfig` thay vì hard-code.
 - Thêm circuit breaker + retry cho Java client.
-- Expose `/metrics` Prometheus (số predict, latency, hit rate).
 - Thử model embedding multilingual cho tên cột tiếng Việt.
 
 > Chi tiết kỹ thuật + Mermaid: xem `BAO-CAO-AUTONOMOUS-REFLECTION.md`, `autonomous-reflection-architecture.svg`, `autonomous-reflection-ingest-sequence.svg`.
@@ -201,22 +175,7 @@ Tự động **đề xuất `dimension` / `measure`** cho Dremio Reflection (k�
 
 ## 4. Tổng kết tháng
 
-### 4.1 Khối lượng công việc
-
-| Hạng mục | File mới/sửa | LOC ước tính | Test |
-|----------|--------------|--------------|------|
-| UI Chatbot | 7 (TS) + 1 inject | ~1100 | 2 spec |
-| LangGraph backend | 11 (Python) | ~1800 | unit test/node |
-| Autonomous Reflection | 5 Python + 4 Java + 2 config | ~1500 | 11 test |
-
-### 4.2 Sản phẩm bàn giao
-
-- 3 báo cáo chi tiết: `BAO-CAO-UI-CHATBOT.md`, `BAO-CAO-BACKEND-LANGGRAPH.md`, `BAO-CAO-AUTONOMOUS-REFLECTION.md`.
-- 4 sơ đồ SVG: `langgraph-state-graph.svg`, `langgraph-sequence-flow.svg`, `autonomous-reflection-architecture.svg`, `autonomous-reflection-ingest-sequence.svg`.
-- 1 hướng dẫn build: `BUILD-FULL-VI.md`.
-- 1 hướng dẫn triển khai Autonomous Reflection: `DEPLOYMENT.md`.
-
-### 4.3 Trạng thái tổng thể
+### 4.1 Trạng thái tổng thể
 
 | Hạng mục | Trạng thái | Ghi chú |
 |----------|-----------|---------|
@@ -225,7 +184,7 @@ Tự động **đề xuất `dimension` / `measure`** cho Dremio Reflection (k�
 | Autonomous Reflection | **Hoàn thành core + ingest** | Cần thay regex SQL parser |
 | Build dự án | ✅ `mvn install -DskipTests` thành công | 41:54 min, 159 module |
 
-### 4.4 Ưu tiên tháng tiếp theo
+### 4.2 Ưu tiên tháng tiếp theo
 
 1. **Refactor UI** thành sub-component + SSE streaming.
 2. **Postgres checkpointer** cho LangGraph.
