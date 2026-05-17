@@ -71,6 +71,12 @@ public final class AutonomousReflectionIngestTask implements Runnable {
       Pattern.compile(
           "(?i)(?:SUM|AVG|COUNT|MIN|MAX)\\s*\\(\\s*(?:\"([^\"]+)\"|([A-Za-z_][A-Za-z0-9_]*))\\s*\\)");
 
+  /** Matches a single SELECT-list item that is an aggregate (optional {@code AS alias}). */
+  private static final Pattern SELECT_ITEM_AGG =
+      Pattern.compile(
+          "(?is)^\\s*(?:SUM|AVG|COUNT|MIN|MAX)\\s*\\(\\s*(?:\"([^\"]+)\"|([A-Za-z_][A-Za-z0-9_]*)|\\*)\\s*\\)"
+              + "(?:\\s+AS\\s+(?:\"[^\"]+\"|[A-Za-z_][A-Za-z0-9_]*))?$");
+
   private static final Pattern GROUP_BY =
       Pattern.compile("(?i)GROUP\\s+BY\\s+(.*?)(?:ORDER|LIMIT|HAVING|$)", Pattern.DOTALL);
 
@@ -154,14 +160,22 @@ public final class AutonomousReflectionIngestTask implements Runnable {
       if (sql == null || sql.isEmpty()) {
         continue;
       }
+      if (sql.trim().toUpperCase().startsWith("REFRESH REFLECTION")) {
+        continue;
+      }
 
       String datasetKey = String.join(".", job.getDatasetPathList());
       Map<String, int[]> colMap = usageMap.computeIfAbsent(datasetKey, k -> new HashMap<>());
       aggregateColumnsFromSql(sql, colMap);
     }
 
+    usageMap.entrySet().removeIf(e -> e.getValue().isEmpty());
+
     if (usageMap.isEmpty()) {
-      logger.debug("No new jobs in window [{}, {}], skipping ingest POST", startMs, endMs);
+      logger.debug(
+          "No column usage in window [{}, {}] (no parseable user SQL), skipping ingest POST",
+          startMs,
+          endMs);
       return;
     }
 
@@ -178,15 +192,26 @@ public final class AutonomousReflectionIngestTask implements Runnable {
     // indices: 0=projection, 1=filter, 2=groupBy, 3=aggregate
     Matcher selMatch = SELECT_COLS.matcher(sql);
     if (selMatch.find()) {
-      String selectList = selMatch.group(1);
-      extractIdents(selectList, colMap, 0);
-    }
-
-    Matcher aggMatch = AGG_FUNC.matcher(sql);
-    while (aggMatch.find()) {
-      String col = aggMatch.group(1) != null ? aggMatch.group(1) : aggMatch.group(2);
-      if (col != null && !"*".equals(col)) {
-        colMap.computeIfAbsent(col, k -> new int[4])[3] += 1;
+      for (String item : splitSelectItems(selMatch.group(1))) {
+        if (item.isEmpty()) {
+          continue;
+        }
+        Matcher aggItem = SELECT_ITEM_AGG.matcher(item);
+        if (aggItem.find()) {
+          String col = aggItem.group(1) != null ? aggItem.group(1) : aggItem.group(2);
+          if (col != null && !"*".equals(col)) {
+            colMap.computeIfAbsent(col, k -> new int[4])[3] += 1;
+          }
+        } else {
+          extractIdents(item, colMap, 0);
+          Matcher nestedAgg = AGG_FUNC.matcher(item);
+          while (nestedAgg.find()) {
+            String col = nestedAgg.group(1) != null ? nestedAgg.group(1) : nestedAgg.group(2);
+            if (col != null && !"*".equals(col)) {
+              colMap.computeIfAbsent(col, k -> new int[4])[3] += 1;
+            }
+          }
+        }
       }
     }
 
@@ -199,6 +224,25 @@ public final class AutonomousReflectionIngestTask implements Runnable {
     if (groupMatch.find()) {
       extractIdents(groupMatch.group(1), colMap, 2);
     }
+  }
+
+  private static List<String> splitSelectItems(String selectList) {
+    List<String> items = new ArrayList<>();
+    int depth = 0;
+    int start = 0;
+    for (int i = 0; i < selectList.length(); i++) {
+      char c = selectList.charAt(i);
+      if (c == '(') {
+        depth++;
+      } else if (c == ')') {
+        depth--;
+      } else if (c == ',' && depth == 0) {
+        items.add(selectList.substring(start, i).trim());
+        start = i + 1;
+      }
+    }
+    items.add(selectList.substring(start).trim());
+    return items;
   }
 
   private static void extractIdents(String fragment, Map<String, int[]> colMap, int idx) {
@@ -233,7 +277,12 @@ public final class AutonomousReflectionIngestTask implements Runnable {
         || "DISTINCT".equals(upper)
         || "ALL".equals(upper)
         || "SELECT".equals(upper)
-        || "FROM".equals(upper);
+        || "FROM".equals(upper)
+        || "SUM".equals(upper)
+        || "AVG".equals(upper)
+        || "COUNT".equals(upper)
+        || "MIN".equals(upper)
+        || "MAX".equals(upper);
   }
 
   private Map<String, Object> buildPayload(
@@ -245,14 +294,6 @@ public final class AutonomousReflectionIngestTask implements Runnable {
 
     List<Map<String, Object>> datasets = new ArrayList<>();
     for (Map.Entry<String, Map<String, int[]>> entry : usageMap.entrySet()) {
-      Map<String, Object> ds = new HashMap<>();
-      String[] parts = entry.getKey().split("\\.");
-      List<String> path = new ArrayList<>();
-      for (String p : parts) {
-        path.add(p);
-      }
-      ds.put("datasetPath", path);
-
       List<Map<String, Object>> columnUsage = new ArrayList<>();
       for (Map.Entry<String, int[]> colEntry : entry.getValue().entrySet()) {
         int[] counts = colEntry.getValue();
@@ -264,6 +305,19 @@ public final class AutonomousReflectionIngestTask implements Runnable {
         cu.put("aggregateCount", counts[3]);
         columnUsage.add(cu);
       }
+      if (columnUsage.isEmpty()) {
+        logger.debug(
+            "Skipping dataset {} in ingest payload: no parseable column usage", entry.getKey());
+        continue;
+      }
+
+      Map<String, Object> ds = new HashMap<>();
+      String[] parts = entry.getKey().split("\\.");
+      List<String> path = new ArrayList<>();
+      for (String p : parts) {
+        path.add(p);
+      }
+      ds.put("datasetPath", path);
       ds.put("columnUsage", columnUsage);
       datasets.add(ds);
     }

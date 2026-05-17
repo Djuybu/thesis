@@ -147,6 +147,9 @@ export class DatasetSettings extends PureComponent {
   }
 
   updateFormDirtyState = (isFormDirty) => {
+    if (this.state.isFormDirty === isFormDirty) {
+      return;
+    }
     this.setState({ isFormDirty }, () =>
       this.props.updateFormDirtyState(isFormDirty),
     );

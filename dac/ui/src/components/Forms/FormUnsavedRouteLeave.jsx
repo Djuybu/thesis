@@ -90,6 +90,9 @@ export function wrapUnsavedChangesWithWrappedForm(WrappedFormController) {
     };
 
     updateFormDirtyState = (isFormDirty) => {
+      if (this.state.isFormDirty === isFormDirty) {
+        return;
+      }
       this.setState({ isFormDirty });
     };
 

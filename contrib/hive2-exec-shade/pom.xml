@@ -157,6 +157,13 @@
 
   <build>
     <plugins>
+      <!-- Parent pins maven-jar-plugin 3.4.x, which uses the JDK modular jar path and fails
+           on this module (InvalidModuleDescriptorException / commons-codec MR-JAR). -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <version>3.3.0</version>
+      </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-shade-plugin</artifactId>
@@ -313,7 +320,10 @@
                   <version>${project.version}</version>
                   <type>jar</type>
                   <overWrite>true</overWrite>
-                  <outputDirectory>${project.build.directory}/classes</outputDirectory>
+                  <!-- Do not unpack into /classes: the next incremental build would run
+                       default-jar on a huge tree (multiple module-info, etc.) and
+                       maven-jar-plugin 3.4+ fails with "Could not create modular JAR file". -->
+                  <outputDirectory>${project.build.directory}/hive2-shaded-unpacked</outputDirectory>
                   <includes>**/**</includes>
                 </artifactItem>
               </artifactItems>

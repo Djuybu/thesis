@@ -32,6 +32,7 @@ import com.dremio.catalog.model.CatalogEntityKey;
 import com.dremio.common.config.SabotConfig;
 import com.dremio.common.exceptions.UserException;
 import com.dremio.common.utils.SqlUtils;
+import com.dremio.config.DremioConfig;
 import com.dremio.context.RequestContext;
 import com.dremio.datastore.api.LegacyKVStoreProvider;
 import com.dremio.exec.catalog.Catalog;
@@ -328,20 +329,23 @@ public class ReflectionServiceImpl extends BaseReflectionService {
   }
 
   private void startAutonomousReflectionIngestTask() {
-    final String enabledKey = "services.autonomous-reflection.ingest.enabled";
-    if (!sabotConfig.hasPath(enabledKey) || !sabotConfig.getBoolean(enabledKey)) {
+    // Ingest settings live in dremio.conf (DremioConfig), not SabotConfig.
+    final DremioConfig dremioConfig = sabotContext.get().getDremioConfig();
+    if (!dremioConfig.hasPath(DremioConfig.AUTONOMOUS_REFLECTION_INGEST_ENABLED)
+        || !dremioConfig.getBoolean(DremioConfig.AUTONOMOUS_REFLECTION_INGEST_ENABLED)) {
       logger.debug(
-          "Autonomous reflection ingest task is disabled (set {} = true to enable)", enabledKey);
+          "Autonomous reflection ingest task is disabled (set {} = true to enable)",
+          DremioConfig.AUTONOMOUS_REFLECTION_INGEST_ENABLED);
       return;
     }
-    String ingestUrl = sabotConfig.getString("services.autonomous-reflection.ingest.url");
+    String ingestUrl = dremioConfig.getString(DremioConfig.AUTONOMOUS_REFLECTION_INGEST_URL);
     String ingestToken =
-        sabotConfig.hasPath("services.autonomous-reflection.ingest.token")
-            ? sabotConfig.getString("services.autonomous-reflection.ingest.token")
+        dremioConfig.hasPath(DremioConfig.AUTONOMOUS_REFLECTION_INGEST_TOKEN)
+            ? dremioConfig.getString(DremioConfig.AUTONOMOUS_REFLECTION_INGEST_TOKEN)
             : "";
     long intervalMin =
-        sabotConfig.hasPath("services.autonomous-reflection.ingest.interval_minutes")
-            ? sabotConfig.getLong("services.autonomous-reflection.ingest.interval_minutes")
+        dremioConfig.hasPath(DremioConfig.AUTONOMOUS_REFLECTION_INGEST_INTERVAL_MINUTES)
+            ? dremioConfig.getLong(DremioConfig.AUTONOMOUS_REFLECTION_INGEST_INTERVAL_MINUTES)
             : 5L;
 
     AutonomousReflectionIngestTask ingestTask =

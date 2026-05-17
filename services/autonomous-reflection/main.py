@@ -1,7 +1,11 @@
+from __future__ import annotations
+
+import logging
 import os
 import joblib
 import pandas as pd
 import json
+import time
 import numpy as np
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request
@@ -11,6 +15,136 @@ from sentence_transformers import SentenceTransformer, util
 
 from ingest_models import IngestRequest, IngestResponse
 import ingest_service
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s - %(message)s",
+)
+logging.getLogger("ingest_service").setLevel(logging.INFO)
+
+_DEBUG_LOG_PATH = "/home/djuybu/thesis/.cursor/debug-205876.log"
+_DEBUG_SESSION = "205876"
+
+
+def _agent_debug_log(
+    hypothesis_id: str,
+    location: str,
+    message: str,
+    data: dict,
+    run_id: str = "pre-fix",
+) -> None:
+    # #region agent log
+    try:
+        payload = {
+            "sessionId": _DEBUG_SESSION,
+            "runId": run_id,
+            "hypothesisId": hypothesis_id,
+            "location": location,
+            "message": message,
+            "data": data,
+            "timestamp": int(time.time() * 1000),
+        }
+        with open(_DEBUG_LOG_PATH, "a", encoding="utf-8") as _df:
+            _df.write(json.dumps(payload, default=str) + "\n")
+    except Exception:
+        pass
+    # #endregion
+
+
+# Dremio AccelCreateReflectionHandler: SUM only on numeric (SqlTypeFamily.NUMERIC / ANY);
+# CHARACTER / TIMESTAMP / etc. allow APPROX_COUNT_DISTINCT, COUNT, MIN, MAX (default COUNT).
+_MEASURE_TYPES_NUMERIC_OK = frozenset(
+    {
+        "DOUBLE",
+        "FLOAT",
+        "REAL",
+        "INTEGER",
+        "INT",
+        "BIGINT",
+        "SMALLINT",
+        "TINYINT",
+        "DECIMAL",
+        "NUMERIC",
+        "NUMBER",
+    }
+)
+_MEASURE_AGG_CONSERVATIVE = frozenset(
+    {"APPROX_COUNT_DISTINCT", "COUNT", "MIN", "MAX"}
+)
+_MEASURE_AGG_WITH_SUM = _MEASURE_AGG_CONSERVATIVE | frozenset({"SUM"})
+
+
+def _normalize_sql_type(type_str: Optional[str]) -> str:
+    return (type_str or "").strip().upper()
+
+
+def _column_type_index(columns: list) -> dict:
+    return {c.name: _normalize_sql_type(c.type) for c in columns}
+
+
+def _adjust_measure_aggregations(sql_type: str, agg_list: List[str]) -> List[str]:
+    """
+    Filter measure aggregations to types Dremio accepts on CREATE REFLECTION.
+    AVG is not a reflection MeasureType — strip it. Non-numeric columns cannot use SUM.
+    """
+    t = _normalize_sql_type(sql_type)
+    raw = [str(a).strip().upper() for a in agg_list if a is not None and str(a).strip()]
+    raw = [a for a in raw if a != "AVG"]
+
+    is_numeric = t in _MEASURE_TYPES_NUMERIC_OK
+    allowed = _MEASURE_AGG_WITH_SUM if is_numeric else _MEASURE_AGG_CONSERVATIVE
+    filtered = [a for a in raw if a in allowed]
+    if filtered:
+        return filtered
+    return ["SUM", "COUNT"] if is_numeric else ["COUNT"]
+
+
+def _encoder_default_model_name() -> str:
+    return os.getenv("REFLECTION_ENCODER_MODEL", "all-MiniLM-L6-v2")
+
+
+def _repair_brain_encoder_if_needed(brain) -> None:
+    """
+    joblib-unpickled SentenceTransformer can be incompatible with the installed
+    sentence-transformers (e.g. missing `.device`), breaking `encode()`.
+    Reinstantiate the encoder and rebuild embeddings from `knowledge_base` keys.
+    """
+    if brain is None or not getattr(brain, "encoder", None):
+        return
+    enc = brain.encoder
+    broken = False
+    try:
+        _ = enc.device
+    except Exception:
+        broken = True
+    if not broken:
+        try:
+            enc.encode(["__ar_encoder_probe__"], show_progress_bar=False)
+        except Exception:
+            broken = True
+    if not broken:
+        return
+
+    model_name = _encoder_default_model_name()
+    old = enc
+    for candidate in (
+        getattr(old, "model_name", None),
+        getattr(getattr(old, "model", None), "config", None)
+        and getattr(old.model.config, "_name_or_path", None),
+    ):
+        if isinstance(candidate, str) and candidate.strip():
+            model_name = candidate.strip()
+            break
+
+    print(
+        f"Repairing pickled SentenceTransformer: reinstantiating encoder ({model_name!r}) "
+        "and rebuilding embeddings."
+    )
+    brain.encoder = SentenceTransformer(model_name)
+    kb = getattr(brain, "knowledge_base", None)
+    if kb and hasattr(brain, "_build_embeddings"):
+        brain._build_embeddings()
+
 
 # ---- CUSTOM MODEL CLASS ----
 class ReflectionBrain:
@@ -61,13 +195,13 @@ class ReflectionBrain:
         print(f"predict_reflection called with columns: {new_table_columns}")
         suggestions = []
         known_names = list(self.knowledge_base.keys())
-        
+
         if len(known_names) == 0:
             # Fallback if knowledge base is empty
             for col in new_table_columns:
                 suggestions.append({'column': col, 'suggested_type': 'None', 'similarity': 0.0, 'matched_with': 'None'})
             return pd.DataFrame(suggestions)
-            
+
         known_embeddings = np.array([v['embedding'] for v in self.knowledge_base.values()])
         new_embeddings = self.encoder.encode(new_table_columns)
 
@@ -111,6 +245,7 @@ async def lifespan(app: FastAPI):
         if os.path.exists(model_path):
             print(f"Loading model from {model_path}...")
             ml_models['brain'] = joblib.load(model_path)
+            _repair_brain_encoder_if_needed(ml_models["brain"])
             print("Model loaded successfully.")
         else:
             print(f"WARNING: Model file not found at {model_path}. Starting in degraded mode.")
@@ -165,13 +300,28 @@ async def health_check():
 async def predict_schema(req: PredictionRequest):
     model = ml_models.get('brain')
     col_names = [c.name for c in req.columns]
-    
+    type_by_col = _column_type_index(req.columns)
+    # #region agent log
+    _agent_debug_log(
+        "H1",
+        "main.py:predict_schema:entry",
+        "predict_schema columns and types",
+        {"datasetPath": req.datasetPath, "typeByCol": type_by_col, "brainLoaded": model is not None},
+    )
+    # #endregion
+
     if model is None:
         dimensions = [c.name for c in req.columns if c.type in ("VARCHAR", "BOOLEAN", "TIMESTAMP")]
         # Create default measure item for the fallback fields
         measures = [
-            MeasurePrediction(name=c.name, aggregations=["SUM", "AVG"]) 
-            for c in req.columns if c.type in ("DOUBLE", "FLOAT", "INTEGER", "DECIMAL")
+            MeasurePrediction(
+                name=c.name,
+                aggregations=_adjust_measure_aggregations(
+                    _normalize_sql_type(c.type), ["SUM", "AVG"]
+                ),
+            )
+            for c in req.columns
+            if c.type in ("DOUBLE", "FLOAT", "INTEGER", "DECIMAL")
         ]
         return PredictionResponse(
             datasetPath=req.datasetPath,
@@ -206,9 +356,25 @@ async def predict_schema(req: PredictionRequest):
                 elif isinstance(aggs_raw, list):
                     agg_list = [str(a).upper() for a in aggs_raw]
                 else:
-                    agg_list = ["SUM", "AVG"] # Default if not provided
-                    
-                measures.append(MeasurePrediction(name=col_name, aggregations=agg_list))
+                    agg_list = ["SUM", "AVG"]  # Default if not provided (adjusted per SQL type below)
+
+                sql_t = type_by_col.get(col_name, "")
+                adjusted = _adjust_measure_aggregations(sql_t, agg_list)
+                # #region agent log
+                _agent_debug_log(
+                    "H2",
+                    "main.py:predict_schema:measure",
+                    "measure aggregations before/after type guard",
+                    {
+                        "column": col_name,
+                        "sqlType": sql_t,
+                        "rawAgg": agg_list,
+                        "adjustedAgg": adjusted,
+                    },
+                )
+                # #endregion
+
+                measures.append(MeasurePrediction(name=col_name, aggregations=adjusted))
                 
             # Log all details regardless of type for UI diagnostics
             details.append(ColumnPredictionDetail(

@@ -145,29 +145,17 @@ Tự động **đề xuất `dimension` / `measure`** cho Dremio Reflection (k�
 
 **Stack:** FastAPI 0.103, sentence-transformers (`all-MiniLM-L6-v2`), joblib, scikit-learn / Jackson, `SchedulerService.asClusteredSingleton`.
 
-**Kiến trúc 2 luồng** (xem `autonomous-reflection-architecture.svg`):
-
-| Luồng | Trigger | Endpoint Python |
-|-------|---------|-----------------|
-| **Inference (đề xuất)** | Khi `ReflectionSuggester.getAggReflections()` chạy | `POST /predict/schema` |
-| **Ingest (học)** | Định kỳ 5 phút trên coordinator-master | `POST /knowledge/ingest` |
-
-**Tính năng đã hoàn thành (Cái này để em viết):**
-
+**Tính năng đã hoàn thành:**
+Hệ thống của nhóm đã có thể phân biệt các cột Dimension/Measure, cũng như loại bỏ các cột không được sử dụng phổ biến theo threshold ban đầu. Nhóm cũng đã cập nhật kiến trúc của các Reflection để có thể bao gồm dữ liệu từ các phép tính (tổng, trung bình, lớn nhất/nhỏ nhất) của những cột 'Measure' có thể thực hiện tính toán.
+Bên cạnh đó, nhóm cũng đã xây dựng hệ thống feedback, giúp mô hình học hỏi từ những câu truy vấn của người dùng để cập nhật các reflection cho phù hợp hơn với yêu cầu của người dùng.
 ### 3.3 Khó khăn
-
-- **Regex SQL parser** không xử lý subquery / CTE / alias lồng → nên thay bằng Calcite parser của Dremio.
-- **In-memory `_processed_batches`** mất idempotency 5 phút đầu sau restart.
-- **Threshold cosine 0.7 hard-code** — chưa cross-validate.
-- `all-MiniLM-L6-v2` chỉ tốt với tên cột tiếng Anh.
+- Mô hình của nhóm đang lựa chọn các cột để đưa vào/loại bỏ khỏi reflection dựa trên một threshold sẵn có (0.7). Tuy nhiên, trong một số trường hợp người dùng có thể sử dụng các cột có threshold thấp nhiều hơn, hoặc tất cả các cột đều được mô hình cho ra kết quả thấp hơn threshold này. Do đó, nhóm hướng tới xây dựng một công thức chi tiết hơn, có cân nhắc tới hành vi người dùng bằng cách theo dõi các truy vấn và tính toán lại trọng số sau một khoảng thời gian nhất định.
+- Nhóm đang sử dụng `all-MiniLM-L6-v2` là một mô hình LLM chỉ tốt khi sử dụng Tiếng Anh. Nếu nguồn dữ liệu có tên các trường được viết bằng ngôn ngữ khác (VD: Tiếng Việt), mô hình có thể trả về kết quả không chính xác. Do đó, nhóm sẽ sử dụng các công cụ hỗ trợ dịch thuật, giúp mô hình có thể hiểu được các tên của bảng.
 
 ### 3.4 Kế hoạch tiếp theo
-
-- Thay regex SQL parser → Calcite parser (Dremio đã có sẵn).
-- Persist `_processed_batches` ra Redis/file.
-- Đọc URL service từ `DremioConfig` thay vì hard-code.
-- Thêm circuit breaker + retry cho Java client.
-- Thử model embedding multilingual cho tên cột tiếng Việt.
+Bên cạnh việc xử lý các lỗi còn tồn đọng, nhóm sẽ tích hợp các tính năng mới:
+- Xây dựng mô hình có thể điều chỉnh dựa trên truy vấn người dùng, sử dụng một công thức mới để tính toán trọng số.
+- Tích hợp các công cụ/thư viện hỗ trợ dịch thuật, xây dựng logic xử lý tên các cột Tiếng Việt (VD: ngay_trong_tuan -> ngày trong tuần -> day of week).
 
 > Chi tiết kỹ thuật + Mermaid: xem `BAO-CAO-AUTONOMOUS-REFLECTION.md`, `autonomous-reflection-architecture.svg`, `autonomous-reflection-ingest-sequence.svg`.
 
@@ -182,7 +170,6 @@ Tự động **đề xuất `dimension` / `measure`** cho Dremio Reflection (k�
 | UI Chatbot | **Hoàn thành cơ bản** | Cần refactor + streaming |
 | LangGraph backend | **Hoàn thành cơ bản** | Cần Postgres saver cho prod |
 | Autonomous Reflection | **Hoàn thành core + ingest** | Cần thay regex SQL parser |
-| Build dự án | ✅ `mvn install -DskipTests` thành công | 41:54 min, 159 module |
 
 ### 4.2 Ưu tiên tháng tiếp theo
 

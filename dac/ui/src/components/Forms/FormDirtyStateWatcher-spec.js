@@ -59,11 +59,12 @@ describe("FormDirtyStateWatcher", () => {
     expect(instance.state.dirty).to.be.true;
   });
 
-  it("should call updateFormDirtyState with true when form is dirty", () => {
+  it("should call updateFormDirtyState with true when form is dirty", async () => {
     const wrapper = shallow(<TestComponent {...minimalProps} />);
     wrapper.setProps({
       dirty: true,
     });
+    await new Promise((resolve) => setTimeout(resolve, 0));
     expect(minimalProps.updateFormDirtyState.calledWith(true)).to.be.true;
   });
 

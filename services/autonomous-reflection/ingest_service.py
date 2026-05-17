@@ -22,7 +22,7 @@ to provide idempotency within a single service lifetime.
 from __future__ import annotations
 
 import logging
-from typing import Set
+from typing import Dict, List, Set, Tuple
 
 from ingest_models import IngestRequest, IngestResponse
 
@@ -36,6 +36,86 @@ MEA_USAGE_KEY = "aggregateCount"
 
 def is_duplicate(batch_id: str) -> bool:
     return batch_id in _processed_batches
+
+
+def _inferred_reflection_role(dim_score: int, mea_score: int) -> str:
+    if dim_score <= 0 and mea_score <= 0:
+        return "none"
+    return "dimension" if dim_score >= mea_score else "measure"
+
+
+def _column_scores(brain, column: str) -> Tuple[int, int]:
+    entry = brain.knowledge_base.get(column)
+    if not entry:
+        return 0, 0
+    return int(entry.get("dim_score", 0)), int(entry.get("mea_score", 0))
+
+
+def _reflection_schema_for_columns(
+    brain, column_names: List[str]
+) -> Dict[str, List[str]]:
+    dimensions: List[str] = []
+    measures: List[str] = []
+    for col in column_names:
+        dim_score, mea_score = _column_scores(brain, col)
+        role = _inferred_reflection_role(dim_score, mea_score)
+        if role == "dimension":
+            dimensions.append(col)
+        elif role == "measure":
+            measures.append(col)
+    return {"dimensions": dimensions, "measures": measures}
+
+
+def _log_reflection_schema_changes(
+    brain,
+    req: IngestRequest,
+    touched_columns: List[str],
+    scores_before: Dict[str, Tuple[int, int]],
+) -> None:
+    """Log how ingest shifts inferred raw/agg reflection roles (dimension vs measure)."""
+    if not touched_columns:
+        return
+
+    role_changes: List[str] = []
+    score_changes: List[str] = []
+    for col in touched_columns:
+        before_dim, before_mea = scores_before.get(col, (0, 0))
+        before_role = _inferred_reflection_role(before_dim, before_mea)
+        after_dim, after_mea = _column_scores(brain, col)
+        after_role = _inferred_reflection_role(after_dim, after_mea)
+
+        if before_role != after_role:
+            role_changes.append(f"{col}: {before_role} -> {after_role}")
+        if before_dim != after_dim or before_mea != after_mea:
+            score_changes.append(
+                f"{col}: dim {before_dim}->{after_dim}, mea {before_mea}->{after_mea}"
+            )
+
+    for ds in req.datasets:
+        cols = [cu.column for cu in ds.columnUsage]
+        schema = _reflection_schema_for_columns(brain, cols)
+        path = ".".join(ds.datasetPath)
+        logger.info(
+            "Reflection schema after ingest batch %s for dataset %s: "
+            "dimensions=%s measures=%s",
+            req.batchId,
+            path,
+            schema["dimensions"],
+            schema["measures"],
+        )
+
+    if role_changes:
+        logger.info(
+            "Reflection role changes after ingest batch %s: %s",
+            req.batchId,
+            "; ".join(role_changes),
+        )
+    if score_changes:
+        logger.info(
+            "Knowledge score deltas for batch %s: %s",
+            req.batchId,
+            "; ".join(score_changes),
+        )
 
 
 def apply_ingest(brain, req: IngestRequest) -> IngestResponse:
@@ -58,6 +138,8 @@ def apply_ingest(brain, req: IngestRequest) -> IngestResponse:
         )
 
     columns_updated = 0
+    touched_columns: List[str] = []
+    pending_updates: List[Tuple[str, int, int]] = []
 
     for ds in req.datasets:
         for cu in ds.columnUsage:
@@ -67,15 +149,22 @@ def apply_ingest(brain, req: IngestRequest) -> IngestResponse:
             if dim_signal == 0 and mea_signal == 0:
                 continue
 
-            if cu.column not in brain.knowledge_base:
-                brain.knowledge_base[cu.column] = {"dim_score": 0, "mea_score": 0}
+            pending_updates.append((cu.column, dim_signal, mea_signal))
 
-            brain.knowledge_base[cu.column]["dim_score"] += dim_signal
-            brain.knowledge_base[cu.column]["mea_score"] += mea_signal
-            columns_updated += 1
+    scores_before: Dict[str, Tuple[int, int]] = {}
+    for column, dim_signal, mea_signal in pending_updates:
+        scores_before[column] = _column_scores(brain, column)
+        if column not in brain.knowledge_base:
+            brain.knowledge_base[column] = {"dim_score": 0, "mea_score": 0}
+
+        brain.knowledge_base[column]["dim_score"] += dim_signal
+        brain.knowledge_base[column]["mea_score"] += mea_signal
+        touched_columns.append(column)
+        columns_updated += 1
 
     if columns_updated > 0:
         brain._build_embeddings()
+        _log_reflection_schema_changes(brain, req, touched_columns, scores_before)
 
     _processed_batches.add(req.batchId)
     logger.info(

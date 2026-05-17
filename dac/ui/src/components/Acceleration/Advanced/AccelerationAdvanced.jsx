@@ -67,6 +67,9 @@ export class AccelerationAdvanced extends Component {
     isGenerating: false,
   };
 
+  /** Last value passed to updateFormDirtyState / updateDirtyState from this component. */
+  _lastAdvancedDirtySignal = undefined;
+
   initialReflections = null;
 
   constructor(props) {
@@ -92,9 +95,9 @@ export class AccelerationAdvanced extends Component {
     );
   }
 
-  componentDidUpdate(newProps) {
-    const { updateDirtyState, values, initialValues } = this.props;
-    const { updateFormDirtyState } = newProps;
+  componentDidUpdate() {
+    const { updateDirtyState, values, initialValues, updateFormDirtyState } =
+      this.props;
     const aggregationReflections = Immutable.fromJS(
       values.aggregationReflections,
     );
@@ -110,20 +113,16 @@ export class AccelerationAdvanced extends Component {
           : initialValues.rawReflections,
     });
 
-    updateFormDirtyState(
-      !this.areAdvancedReflectionsFieldsEqual(
-        aggregationReflections,
-        rawReflections,
-      ),
-    ); // ! is needed. Returned value of true means not dirty, but would mean to dirty to updateDirtyState
-
-    // This updates the canSubmit state by updating the dirty state in <AccelerationForm />, do not remove.
-    updateDirtyState(
-      !this.areAdvancedReflectionsFieldsEqual(
-        aggregationReflections,
-        rawReflections,
-      ),
+    const isDirtyForm = !this.areAdvancedReflectionsFieldsEqual(
+      aggregationReflections,
+      rawReflections,
     );
+
+    if (this._lastAdvancedDirtySignal !== isDirtyForm) {
+      this._lastAdvancedDirtySignal = isDirtyForm;
+      updateFormDirtyState(isDirtyForm);
+      updateDirtyState(isDirtyForm);
+    }
   }
 
   getActiveTab() {

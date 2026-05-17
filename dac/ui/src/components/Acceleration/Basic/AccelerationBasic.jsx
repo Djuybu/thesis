@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 import { Component } from "react";
+import ReactDOM from "react-dom";
 import { connect } from "react-redux";
 import PropTypes from "prop-types";
 import Immutable from "immutable";
@@ -66,50 +67,82 @@ export class AccelerationBasic extends Component {
         .filter((d) => !d.includes("$"))
         .map((d) => ({ name: d }));
 
-      import("react-dom").then((ReactDOM) => {
-        ReactDOM.unstable_batchedUpdates(() => {
-          if (rawReflection && rawReflection.enabled) {
-            rawReflection.enabled.onChange(rawDisplayFields.length > 0);
+      const dimensionFields = dims
+        .filter((d) => !d.includes("$"))
+        .map((d) => ({ name: d }));
+      const measureFields = meas
+        .filter((d) => !d.name.includes("$"))
+        .map((d) => ({
+          name: d.name,
+          measureTypeList: d.aggregations || ["SUM", "COUNT"],
+        }));
+      const hasAgg = dimensionFields.length > 0 || measureFields.length > 0;
+
+      // Keep first aggregation reflection + BASIC column pickers aligned before the next
+      // AccelerationForm.componentDidUpdate sync pass. If only columns* are updated while
+      // aggregationReflections[0].dimensionFields/measures stay stale, syncAdvancedToBasic
+      // runs first and overwrites the new columns with old aggregation data (#185 / wrong UI).
+      ReactDOM.unstable_batchedUpdates(() => {
+        if (rawReflection?.displayFields) {
+          for (let i = rawReflection.displayFields.length - 1; i >= 0; i--) {
+            rawReflection.displayFields.removeField(i);
+          }
+          rawDisplayFields.forEach((row) =>
+            rawReflection.displayFields.addField(row),
+          );
+        }
+        if (rawReflection && rawReflection.enabled) {
+          rawReflection.enabled.onChange(rawDisplayFields.length > 0);
+        }
+
+        if (aggReflection) {
+          if (aggReflection.enabled) {
+            aggReflection.enabled.onChange(hasAgg);
           }
 
-          // Enable agg and set fields
-          const dimensionFields = dims
-            .filter((d) => !d.includes("$"))
-            .map((d) => ({ name: d }));
-          const measureFields = meas
-            .filter((d) => !d.name.includes("$"))
-            .map((d) => ({
-              name: d.name,
-              measureTypeList: d.aggregations || ["SUM", "COUNT"],
-            }));
-
-          if (aggReflection) {
-            const hasAgg =
-              dimensionFields.length > 0 || measureFields.length > 0;
-            if (aggReflection.enabled) {
-              aggReflection.enabled.onChange(hasAgg);
+          if (aggReflection.dimensionFields && aggReflection.measureFields) {
+            for (
+              let i = aggReflection.dimensionFields.length - 1;
+              i >= 0;
+              i--
+            ) {
+              aggReflection.dimensionFields.removeField(i);
             }
-
+            for (let i = aggReflection.measureFields.length - 1; i >= 0; i--) {
+              aggReflection.measureFields.removeField(i);
+            }
             if (hasAgg) {
-              for (let i = fields.columnsDimensions.length - 1; i >= 0; i--) {
-                fields.columnsDimensions.removeField(i);
-              }
-              for (let i = fields.columnsMeasures.length - 1; i >= 0; i--) {
-                fields.columnsMeasures.removeField(i);
-              }
-
               dimensionFields.forEach((f) =>
-                fields.columnsDimensions.addField({ column: f.name }),
+                aggReflection.dimensionFields.addField({ name: f.name }),
               );
               measureFields.forEach((f) =>
-                fields.columnsMeasures.addField({
-                  column: f.name,
+                aggReflection.measureFields.addField({
+                  name: f.name,
                   measureTypeList: f.measureTypeList,
                 }),
               );
             }
           }
-        });
+
+          if (hasAgg) {
+            for (let i = fields.columnsDimensions.length - 1; i >= 0; i--) {
+              fields.columnsDimensions.removeField(i);
+            }
+            for (let i = fields.columnsMeasures.length - 1; i >= 0; i--) {
+              fields.columnsMeasures.removeField(i);
+            }
+
+            dimensionFields.forEach((f) =>
+              fields.columnsDimensions.addField({ column: f.name }),
+            );
+            measureFields.forEach((f) =>
+              fields.columnsMeasures.addField({
+                column: f.name,
+                measureTypeList: f.measureTypeList,
+              }),
+            );
+          }
+        }
       });
     } catch (e) {
       console.error("Failed to generate Autonomous Reflection", e);

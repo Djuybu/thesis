@@ -65,6 +65,11 @@ import { Spinner } from "dremio-ui-lib/components";
 
 const SECTIONS = [AccelerationBasic, AccelerationAdvanced];
 
+/** Plain redux-form values vs Field nodes both use { value } wrappers — normalize for sync. */
+function unpackFormScalar(x) {
+  return x != null && typeof x === "object" && "value" in x ? x.value : x;
+}
+
 export class AccelerationForm extends Component {
   static propTypes = {
     dataset: PropTypes.instanceOf(Immutable.Map).isRequired,
@@ -498,23 +503,39 @@ export class AccelerationForm extends Component {
     const firstAggReflection = values.aggregationReflections[0];
     const prevFirstAggReflection = prevValues.aggregationReflections[0];
 
-    // sync any changes made to the first aggregation reflection in ADVANCED to BASIC
-    if (!deepEqual(firstAggReflection, prevFirstAggReflection)) {
-      this.syncAdvancedToBasic(firstAggReflection);
-    }
+    // Only sync BASIC column pickers with the first aggregation reflection while in BASIC mode.
+    // In ADVANCED mode, programmatic updates (e.g. Autonomous Reflection) change aggregationReflections
+    // without touching columnsDimensions; running syncAdvancedToBasic then syncBasicToAdvanced here
+    // mutates both sides in one pass and can ping-pong until React hits max update depth (#185).
+    if (mode === "BASIC") {
+      const { columnsDimensions, columnsMeasures } = values;
+      const {
+        columnsDimensions: prevColumnsDimensions,
+        columnsMeasures: prevColumnsMeasures,
+      } = prevValues;
 
-    const { columnsDimensions, columnsMeasures } = values;
-    const {
-      columnsDimensions: prevColumnsDimensions,
-      columnsMeasures: prevColumnsMeasures,
-    } = prevValues;
+      const columnsDirty =
+        !deepEqual(columnsDimensions, prevColumnsDimensions) ||
+        !deepEqual(columnsMeasures, prevColumnsMeasures);
+      const firstAggDirty = !deepEqual(
+        firstAggReflection,
+        prevFirstAggReflection,
+      );
 
-    // sync any changes made to the aggregation'sdimensions / measures in BASIC to ADVANCED
-    if (
-      !deepEqual(columnsDimensions, prevColumnsDimensions) ||
-      !deepEqual(columnsMeasures, prevColumnsMeasures)
-    ) {
-      this.syncBasicToAdvanced();
+      if (columnsDirty && firstAggDirty) {
+        // Both changed in one redux-form batch (e.g. BASIC Autonomous Reflection updates
+        // columns* and aggregationReflections[0] together). Columns are authoritative for
+        // BASIC UI; running syncAdvancedToBasic first would rebuild columns from aggregation
+        // and can fight the batch or re-trigger syncBasicToAdvanced until max depth (#185).
+        this.syncBasicToAdvanced();
+      } else {
+        if (firstAggDirty) {
+          this.syncAdvancedToBasic(firstAggReflection);
+        }
+        if (columnsDirty) {
+          this.syncBasicToAdvanced();
+        }
+      }
     }
 
     // will force the form to ADVANCED mode if the recommendations contain non-basic values,
@@ -539,11 +560,14 @@ export class AccelerationForm extends Component {
 
     if (!firstAggValues) return;
 
-    firstAggValues.dimensionFields.forEach(({ name }) =>
-      columnsDimensions.addField({ column: name }),
+    firstAggValues.dimensionFields.forEach((df) =>
+      columnsDimensions.addField({ column: unpackFormScalar(df.name) }),
     );
-    firstAggValues.measureFields.forEach(({ name }) =>
-      columnsMeasures.addField({ column: name }),
+    firstAggValues.measureFields.forEach((mf) =>
+      columnsMeasures.addField({
+        column: unpackFormScalar(mf.name),
+        ...(mf.measureTypeList && { measureTypeList: mf.measureTypeList }),
+      }),
     );
   }
 
@@ -554,28 +578,50 @@ export class AccelerationForm extends Component {
 
     // Note: we are careful to preserve granularity when syncing this direction
 
-    const dimensionSet = new Set(columnsDimensionsValues.map((v) => v.column));
-    const measureSet = new Set(columnsMeasuresValues.map((v) => v.column));
+    const dimensionSet = new Set(
+      columnsDimensionsValues.map((v) => unpackFormScalar(v.column)),
+    );
+    const measureSet = new Set(
+      columnsMeasuresValues.map((v) => unpackFormScalar(v.column)),
+    );
+    const measureRowByColumn = new Map(
+      columnsMeasuresValues.map((v) => [unpackFormScalar(v.column), v]),
+    );
 
-    firstAgg.dimensionFields.forEach(({ name }, i) => {
-      if (!dimensionSet.delete(name.value))
-        firstAgg.dimensionFields.removeField(i);
-    });
-    firstAgg.measureFields.forEach(({ name }, i) => {
-      if (!measureSet.delete(name.value)) firstAgg.measureFields.removeField(i);
-    });
+    // Remove in reverse index order: removeField during forward forEach skips/shifts indices.
+    for (let i = firstAgg.dimensionFields.length - 1; i >= 0; i--) {
+      const nm = unpackFormScalar(firstAgg.dimensionFields[i].name.value);
+      if (!dimensionSet.delete(nm)) firstAgg.dimensionFields.removeField(i);
+    }
+    for (let i = firstAgg.measureFields.length - 1; i >= 0; i--) {
+      const nm = unpackFormScalar(firstAgg.measureFields[i].name.value);
+      if (!measureSet.delete(nm)) firstAgg.measureFields.removeField(i);
+    }
 
     for (const name of dimensionSet)
       firstAgg.dimensionFields.addField({ name });
-    for (const name of measureSet) firstAgg.measureFields.addField({ name });
+    for (const name of measureSet) {
+      const row = measureRowByColumn.get(name);
+      const payload = { name };
+      if (row?.measureTypeList) {
+        payload.measureTypeList = row.measureTypeList;
+      }
+      firstAgg.measureFields.addField(payload);
+    }
   }
 
   toggleMode = (e) => {
     e.stopPropagation();
     e.preventDefault();
     const { mode } = this.state;
-    this.setState({
-      mode: mode === "BASIC" ? "ADVANCED" : "BASIC",
+    const nextMode = mode === "BASIC" ? "ADVANCED" : "BASIC";
+    this.setState({ mode: nextMode }, () => {
+      if (nextMode === "BASIC") {
+        const firstAgg = this.props.values?.aggregationReflections?.[0];
+        if (firstAgg) {
+          this.syncAdvancedToBasic(firstAgg);
+        }
+      }
     });
   };
 
@@ -818,6 +864,9 @@ export class AccelerationForm extends Component {
 
   // used to update the dirty state properly for AccelerationAdvanced instead of updateFormDirtyState
   updateDirtyState = (isDirty) => {
+    if (this.state.formIsDirty === isDirty) {
+      return;
+    }
     this.setState({
       formIsDirty: isDirty,
     });

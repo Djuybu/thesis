@@ -16,7 +16,7 @@
 import { Component } from "react";
 import PropTypes from "prop-types";
 import Immutable from "immutable";
-import { get, noop } from "lodash";
+import { get } from "lodash";
 
 export default function FormDirtyStateWatcher(Form) {
   return class extends Component {
@@ -89,13 +89,20 @@ export default function FormDirtyStateWatcher(Form) {
     }
 
     UNSAFE_componentWillReceiveProps(nextProps) {
-      const dirty = nextProps.dirty || this.areArrayFieldsDirty(nextProps);
-      let callBack = noop;
+      const arrDirty = this.areArrayFieldsDirty(nextProps);
+      const dirty = nextProps.dirty || arrDirty;
       if (this.state.dirty !== dirty) {
-        if (this.props.updateFormDirtyState) {
-          callBack = () => this.props.updateFormDirtyState(dirty);
+        const notifyParent = this.props.updateFormDirtyState;
+        if (notifyParent) {
+          // Defer parent updates: calling updateFormDirtyState synchronously from this
+          // setState completion callback can exceed React's max update depth (#185) when
+          // redux-form re-renders and immediately feeds new props back into this watcher.
+          this.setState({ dirty }, () => {
+            setTimeout(() => notifyParent(dirty), 0);
+          });
+        } else {
+          this.setState({ dirty });
         }
-        this.setState({ dirty }, callBack);
       }
     }
 

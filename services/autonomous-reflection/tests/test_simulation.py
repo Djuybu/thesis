@@ -41,6 +41,7 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 import main as ar_main  # noqa: E402
+from conftest import RuleBrain  # noqa: E402
 
 
 def _labeled_json(column: str, type_label: str) -> str:
@@ -91,6 +92,22 @@ def _prune_reflection_by_usage(
     dim_kept = {d for d in dimensions if keep(d)}
     mea_kept = {m["name"] for m in measures if keep(m["name"])}
     return dim_kept, mea_kept
+
+
+def test_varchar_column_as_measure_gets_no_sum(client_with_rule_brain) -> None:
+    """
+    Semantic model có thể gợi ý Measure cho cột chữ (vd. STATION); Dremio không cho SUM trên CHARACTER.
+    """
+    ar_main.ml_models["brain"] = RuleBrain(set(), {"STATION"})
+    data = _post_predict(
+        client_with_rule_brain,
+        [("STATION", "VARCHAR")],
+        dataset_path=["Samples", "samples.dremio.com", "SF weather 2018-2019.csv"],
+    )
+    m = next(x for x in data["measures"] if x["name"] == "STATION")
+    assert "SUM" not in m["aggregations"], m
+    assert "AVG" not in m["aggregations"], m
+    assert m["aggregations"] == ["COUNT"], m
 
 
 def test_schema_predict_dimension_vs_measure(client_with_rule_brain) -> None:

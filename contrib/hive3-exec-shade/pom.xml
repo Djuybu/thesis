@@ -141,6 +141,12 @@
 
   <build>
     <plugins>
+      <!-- Same as hive2: avoid maven-jar-plugin 3.4.x modular jar failure on shaded Hive. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <version>3.3.0</version>
+      </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-shade-plugin</artifactId>
@@ -287,7 +293,8 @@
                   <version>${project.version}</version>
                   <type>jar</type>
                   <overWrite>true</overWrite>
-                  <outputDirectory>${project.build.directory}/classes</outputDirectory>
+                  <!-- See dremio-hive2-exec-shaded: unpacking into /classes breaks incremental builds. -->
+                  <outputDirectory>${project.build.directory}/hive3-shaded-unpacked</outputDirectory>
                   <includes>**/**</includes>
                 </artifactItem>
               </artifactItems>

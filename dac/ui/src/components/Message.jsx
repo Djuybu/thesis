@@ -20,7 +20,6 @@ import Linkify from "linkifyjs/react";
 import PropTypes from "prop-types";
 import { Link } from "react-router";
 import { FormattedMessage } from "react-intl";
-import { v4 as uuidv4 } from "uuid";
 import { Checkbox } from "dremio-ui-lib/components";
 
 import { fixedWidthDefault } from "uiTheme/radium/typography";
@@ -260,7 +259,7 @@ class Message extends PureComponent {
       borderTop: "1px solid hsla(0, 0%, 0%, 0.2)",
     };
     details = details.map((e, i) => (
-      <div key={uuidv4()} style={i ? separatedStyle : {}}>
+      <div key={`message-detail-${i}`} style={i ? separatedStyle : {}}>
         {e}
       </div>
     ));
