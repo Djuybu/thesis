@@ -14,6 +14,9 @@
  * limitations under the License.
  */
 import clsx from "clsx";
+import { getSonarContext } from "dremio-ui-common/contexts/SonarContext.js";
+import * as sqlPaths from "dremio-ui-common/paths/sqlEditor.js";
+import { rmProjectBase } from "dremio-ui-common/utilities/projectBase.js";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { chatService, hasAuthToken } from "./chatService";
 import {
@@ -30,8 +33,8 @@ import type {
   HitlInterrupt,
 } from "./types";
 import * as classes from "./AIChatbot.module.less";
+import { MessageActionBar } from "./MessageActionBar";
 
-const SQL_DRAFT_KEY = "aichatbot-plugin-sql-draft";
 const MAX_PROMPT_LENGTH = 2000;
 const SOFT_PROMPT_LIMIT = 1600;
 const QUICK_PROMPTS = [
@@ -79,6 +82,9 @@ export const AIChatbot = () => {
   const [pendingInterrupt, setPendingInterrupt] =
     useState<HitlInterrupt | null>(null);
   const [pendingThreadId, setPendingThreadId] = useState<string | null>(null);
+  const [interruptMessageId, setInterruptMessageId] = useState<string | null>(
+    null,
+  );
   const [sqlEditValue, setSqlEditValue] = useState("");
   const [sessions, setSessions] = useState<ChatSession[]>(() => {
     const existing = chatService.loadSessions();
@@ -168,27 +174,45 @@ export const AIChatbot = () => {
     setActiveSessionId(session.id);
     setPendingInterrupt(null);
     setPendingThreadId(null);
+    setInterruptMessageId(null);
     setIsOpen(true);
   };
 
-  const runSql = async (sql: string) => {
-    try {
-      await navigator.clipboard.writeText(sql);
-      setToast("Đã copy SQL.");
-    } catch {
-      setToast("Không copy được SQL.");
+  const openSqlInRunner = (sql: string) => {
+    const trimmed = sql.trim();
+    if (!trimmed) return;
+
+    chatService.storeSqlDraft(trimmed);
+    window.dispatchEvent(
+      new CustomEvent("aichatbot-run-sql", { detail: { sql: trimmed } }),
+    );
+
+    const onSqlRunner = rmProjectBase(window.location.pathname).startsWith(
+      "/new_query",
+    );
+    if (!onSqlRunner) {
+      const projectId = getSonarContext()?.getSelectedProjectId?.();
+      window.location.assign(sqlPaths.newQuery.link({ projectId }));
+    } else {
+      setToast("Đã gửi SQL sang SQL Runner.");
     }
-    chatService.storeSqlDraft(sql);
-    localStorage.setItem(SQL_DRAFT_KEY, sql);
-    window.location.assign("/new_query");
   };
 
   const copyMessage = async (message: ChatMessage) => {
     try {
       await navigator.clipboard.writeText(message.raw);
-      setToast("Đã copy nội dung.");
+      setToast("Đã sao chép nội dung.");
     } catch {
-      setToast("Không copy được nội dung.");
+      setToast("Không sao chép được nội dung.");
+    }
+  };
+
+  const copySqlText = async (sql: string) => {
+    try {
+      await navigator.clipboard.writeText(sql);
+      setToast("Đã sao chép SQL.");
+    } catch {
+      setToast("Không sao chép được SQL.");
     }
   };
 
@@ -211,8 +235,10 @@ export const AIChatbot = () => {
         threadId: payload.thread_id,
       }));
       const raw = formatInterruptMessage(interrupt);
+      const messageId = uid();
+      setInterruptMessageId(messageId);
       appendMessage(activeSession.id, {
-        id: uid(),
+        id: messageId,
         role: "assistant",
         raw,
         parsed: parseMessageContent(raw),
@@ -221,6 +247,7 @@ export const AIChatbot = () => {
     } else if (payload.status === "completed") {
       setPendingInterrupt(null);
       setPendingThreadId(null);
+      setInterruptMessageId(null);
       const raw = pickAnswerText(payload);
       const dataRows: DataRow[] = Array.isArray(payload.execution_result)
         ? payload.execution_result
@@ -235,6 +262,7 @@ export const AIChatbot = () => {
     } else {
       setPendingInterrupt(null);
       setPendingThreadId(null);
+      setInterruptMessageId(null);
       const raw = `Lỗi: ${payload.error || "Unknown error"}`;
       appendMessage(activeSession.id, {
         id: uid(),
@@ -423,153 +451,174 @@ export const AIChatbot = () => {
                     ))}
                   </div>
                 )}
-                {activeSession.messages.map((message) => (
-                  <article
-                    key={message.id}
-                    className={clsx(
-                      classes.bubble,
-                      message.role === "user"
-                        ? classes.userBubble
-                        : classes.assistantBubble,
-                    )}
-                  >
-                    <div className={classes.bubbleMeta}>
-                      <span className={classes.avatar}>
-                        {message.role === "user" ? "U" : "AI"}
-                      </span>
-                      <span>{message.role === "user" ? "Bạn" : "Trợ lý"}</span>
-                      <span>
-                        {new Date(message.createdAt).toLocaleTimeString()}
-                      </span>
-                    </div>
-                    <div
-                      dangerouslySetInnerHTML={{ __html: message.parsed.html }}
-                    />
-                    {message.parsed.sqlBlocks.map((sql) => (
-                      <div key={`${message.id}-${sql.slice(0, 16)}`}>
-                        <button
-                          className={classes.btn}
-                          onClick={() => runSql(sql)}
-                        >
-                          Run this SQL
-                        </button>
-                        <button
-                          className={classes.btn}
-                          onClick={async () => {
-                            try {
-                              await navigator.clipboard.writeText(sql);
-                              setToast("Đã copy SQL block.");
-                            } catch {
-                              setToast("Không copy được SQL block.");
-                            }
-                          }}
-                        >
-                          Copy SQL
-                        </button>
+                {activeSession.messages.map((message) => {
+                  const isPendingHitlMessage =
+                    message.id === interruptMessageId &&
+                    !!pendingInterrupt &&
+                    !isTyping;
+                  const showSqlRunnerActions =
+                    message.parsed.sqlBlocks.length > 0 &&
+                    !isPendingHitlMessage;
+                  const showSqlCopyOnlyDuringHitl =
+                    isPendingHitlMessage &&
+                    pendingInterrupt?.action === "sql_approval" &&
+                    message.parsed.sqlBlocks.length > 0;
+                  const showRegenerateIcon =
+                    message.role === "assistant" &&
+                    !pendingInterrupt &&
+                    !!lastPrompt;
+
+                  return (
+                    <article
+                      key={message.id}
+                      className={clsx(
+                        classes.bubble,
+                        message.role === "user"
+                          ? classes.userBubble
+                          : classes.assistantBubble,
+                      )}
+                    >
+                      <div className={classes.bubbleMeta}>
+                        <span className={classes.avatar}>
+                          {message.role === "user" ? "U" : "AI"}
+                        </span>
+                        <span>
+                          {message.role === "user" ? "Bạn" : "Trợ lý"}
+                        </span>
+                        <span>
+                          {new Date(message.createdAt).toLocaleTimeString()}
+                        </span>
                       </div>
-                    ))}
-                    {message.parsed.tableRows.length > 0 && (
-                      <table className={classes.table}>
-                        <thead>
-                          <tr>
-                            {Object.keys(message.parsed.tableRows[0]).map(
-                              (key) => (
-                                <th key={key}>{key}</th>
-                              ),
-                            )}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {message.parsed.tableRows
-                            .slice(0, 6)
-                            .map((row, index) => (
-                              <tr key={`${message.id}-row-${index}`}>
-                                {Object.keys(message.parsed.tableRows[0]).map(
-                                  (key) => (
-                                    <td key={`${message.id}-${index}-${key}`}>
-                                      {String(row[key] ?? "")}
-                                    </td>
-                                  ),
-                                )}
-                              </tr>
-                            ))}
-                        </tbody>
-                      </table>
-                    )}
-                    <div className={classes.messageActions}>
-                      <button
-                        className={classes.linkBtn}
-                        onClick={() => void copyMessage(message)}
-                      >
-                        Copy
-                      </button>
-                      {message.role === "assistant" && (
-                        <>
-                          <button
-                            className={classes.linkBtn}
-                            onClick={() => {
-                              void askAI(lastPrompt);
-                            }}
-                            disabled={isTyping || !lastPrompt}
-                          >
-                            Retry
-                          </button>
-                          <button
-                            className={classes.linkBtn}
-                            onClick={() => {
-                              void askAI(lastPrompt);
-                            }}
-                            disabled={isTyping || !lastPrompt}
-                          >
-                            Regenerate
-                          </button>
-                          <button
-                            className={clsx(
-                              classes.linkBtn,
-                              message.feedback === "up" &&
-                                classes.linkBtnActive,
-                            )}
-                            onClick={() => {
-                              setMessageFeedback(
-                                activeSession.id,
-                                message.id,
-                                "up",
-                              );
-                            }}
-                          >
-                            Like
-                          </button>
-                          <button
-                            className={clsx(
-                              classes.linkBtn,
-                              message.feedback === "down" &&
-                                classes.linkBtnActive,
-                            )}
-                            onClick={() => {
-                              setMessageFeedback(
-                                activeSession.id,
-                                message.id,
-                                "down",
-                              );
-                            }}
-                          >
-                            Dislike
-                          </button>
-                        </>
+                      <div
+                        dangerouslySetInnerHTML={{
+                          __html: message.parsed.html,
+                        }}
+                      />
+                      {showSqlRunnerActions &&
+                        message.parsed.sqlBlocks.map((sql) => (
+                          <div key={`${message.id}-${sql.slice(0, 16)}`}>
+                            <button
+                              className={clsx(classes.btn, classes.primaryBtn)}
+                              type="button"
+                              onClick={() => openSqlInRunner(sql)}
+                            >
+                              Mở trong SQL Runner
+                            </button>
+                            <button
+                              className={classes.btn}
+                              type="button"
+                              onClick={() => void copySqlText(sql)}
+                            >
+                              Sao chép SQL
+                            </button>
+                          </div>
+                        ))}
+                      {showSqlCopyOnlyDuringHitl &&
+                        message.parsed.sqlBlocks.map((sql) => (
+                          <div key={`${message.id}-hitl-${sql.slice(0, 16)}`}>
+                            <button
+                              className={classes.btn}
+                              type="button"
+                              onClick={() => void copySqlText(sql)}
+                            >
+                              Sao chép SQL
+                            </button>
+                          </div>
+                        ))}
+                      {message.parsed.tableRows.length > 0 && (
+                        <table className={classes.table}>
+                          <thead>
+                            <tr>
+                              {Object.keys(message.parsed.tableRows[0]).map(
+                                (key) => (
+                                  <th key={key}>{key}</th>
+                                ),
+                              )}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {message.parsed.tableRows
+                              .slice(0, 6)
+                              .map((row, index) => (
+                                <tr key={`${message.id}-row-${index}`}>
+                                  {Object.keys(message.parsed.tableRows[0]).map(
+                                    (key) => (
+                                      <td key={`${message.id}-${index}-${key}`}>
+                                        {String(row[key] ?? "")}
+                                      </td>
+                                    ),
+                                  )}
+                                </tr>
+                              ))}
+                          </tbody>
+                        </table>
                       )}
-                      {message.role === "user" && (
-                        <button
-                          className={classes.linkBtn}
-                          onClick={() => {
-                            setInput(message.raw);
-                          }}
-                        >
-                          Edit prompt
-                        </button>
+                      {isPendingHitlMessage && pendingInterrupt && (
+                        <div className={classes.hitlActions}>
+                          {pendingInterrupt.action === "sql_approval" && (
+                            <textarea
+                              className={classes.input}
+                              value={sqlEditValue}
+                              rows={3}
+                              onChange={(e) => setSqlEditValue(e.target.value)}
+                              placeholder="Chỉnh sửa SQL nếu cần..."
+                            />
+                          )}
+                          <div className={classes.hitlButtons}>
+                            <button
+                              type="button"
+                              className={clsx(classes.btn, classes.primaryBtn)}
+                              onClick={() => void handleHitlAction("approve")}
+                              disabled={!loggedIn}
+                            >
+                              Phê duyệt
+                            </button>
+                            {pendingInterrupt.action === "sql_approval" && (
+                              <button
+                                type="button"
+                                className={classes.btn}
+                                onClick={() => void handleHitlAction("edit")}
+                                disabled={!loggedIn || !sqlEditValue.trim()}
+                              >
+                                Sửa &amp; Chạy
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              className={classes.btn}
+                              onClick={() => void handleHitlAction("reject")}
+                              disabled={!loggedIn}
+                            >
+                              Từ chối
+                            </button>
+                          </div>
+                        </div>
                       )}
-                    </div>
-                  </article>
-                ))}
+                      <MessageActionBar
+                        message={message}
+                        onCopy={() => void copyMessage(message)}
+                        showRegenerate={showRegenerateIcon}
+                        onRegenerate={() => void askAI(lastPrompt)}
+                        regenerateDisabled={isTyping || !lastPrompt}
+                        onFeedback={
+                          message.role === "assistant"
+                            ? (feedback) =>
+                                setMessageFeedback(
+                                  activeSession.id,
+                                  message.id,
+                                  feedback,
+                                )
+                            : undefined
+                        }
+                        onEditPrompt={
+                          message.role === "user"
+                            ? () => setInput(message.raw)
+                            : undefined
+                        }
+                      />
+                    </article>
+                  );
+                })}
                 {isTyping && (
                   <div
                     className={clsx(classes.bubble, classes.assistantBubble)}
@@ -591,46 +640,6 @@ export const AIChatbot = () => {
                   </div>
                 )}
               </div>
-
-              {/* HITL action bar */}
-              {pendingInterrupt && !isTyping && (
-                <div className={classes.inputBar}>
-                  {pendingInterrupt.action === "sql_approval" && (
-                    <textarea
-                      className={classes.input}
-                      value={sqlEditValue}
-                      rows={3}
-                      onChange={(e) => setSqlEditValue(e.target.value)}
-                      placeholder="Chỉnh sửa SQL nếu cần..."
-                    />
-                  )}
-                  <div className={classes.headerActions}>
-                    <button
-                      className={clsx(classes.btn, classes.primaryBtn)}
-                      onClick={() => void handleHitlAction("approve")}
-                      disabled={!loggedIn}
-                    >
-                      Phê duyệt
-                    </button>
-                    {pendingInterrupt.action === "sql_approval" && (
-                      <button
-                        className={classes.btn}
-                        onClick={() => void handleHitlAction("edit")}
-                        disabled={!loggedIn || !sqlEditValue.trim()}
-                      >
-                        Sửa &amp; Chạy
-                      </button>
-                    )}
-                    <button
-                      className={classes.btn}
-                      onClick={() => void handleHitlAction("reject")}
-                      disabled={!loggedIn}
-                    >
-                      Từ chối
-                    </button>
-                  </div>
-                </div>
-              )}
 
               {!loggedIn && (
                 <div className={classes.errorText}>
@@ -719,6 +728,7 @@ export const AIChatbot = () => {
                     setActiveSessionId(session.id);
                     setPendingInterrupt(null);
                     setPendingThreadId(null);
+                    setInterruptMessageId(null);
                   }}
                 >
                   <div className={classes.historyItemTitle}>

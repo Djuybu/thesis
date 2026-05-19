@@ -209,6 +209,72 @@
   font-weight: 700;
 }
 
+.hitlActions {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border--neutral, #3c4f63);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hitlButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.messageActionBar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: 8px;
+  padding-top: 4px;
+}
+
+.iconActionBtn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text--subtle, #9fb4ca);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
+}
+
+.iconActionBtn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--fill--secondary, #2d3a47) 90%, #fff);
+  color: var(--text--primary, #f5f8fb);
+}
+
+.iconActionBtn:focus-visible {
+  outline: 2px solid var(--border--focused, #8ad7e2);
+  outline-offset: 1px;
+}
+
+.iconActionBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.iconActionBtnActive {
+  color: var(--fill--primary--brand, #63d3e2);
+}
+
+.iconActionSvg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
 .messageActions {
   display: flex;
   gap: 8px;
