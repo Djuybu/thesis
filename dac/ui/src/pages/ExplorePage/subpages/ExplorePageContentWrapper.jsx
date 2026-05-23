@@ -194,6 +194,8 @@ import { deleteQuerySelectionsFromStorage } from "#oss/sagas/utils/querySelectio
 import { deleteScripts } from "#oss/exports/endpoints/Scripts/deleteScripts";
 import { store } from "#oss/store/store";
 
+const AICHAT_SQL_DRAFT_KEY = "aichatbot-plugin-sql-draft";
+
 const newQueryLink = newQuery();
 const SIDEBAR_MIN_WIDTH = 300;
 const COLLAPSED_SIDEBAR_WIDTH = 36;
@@ -388,6 +390,41 @@ export class ExplorePageContentWrapper extends PureComponent {
     handleOpenTabScript(router)(script);
   };
 
+  applyAichatSqlDraft = async (sql) => {
+    const trimmed = (sql || "").trim();
+    if (!trimmed) {
+      return false;
+    }
+
+    if ((await getSupportFlag(SQLRUNNER_TABS_UI)).value) {
+      await this.createNewTabWithSql(
+        trimmed,
+        undefined,
+        this.props.queryContext,
+      );
+      return true;
+    }
+
+    this.handleQueryPathWithoutTabs(trimmed);
+    return true;
+  };
+
+  consumeAichatSqlDraftFromStorage = async () => {
+    const draft = localStorage.getItem(AICHAT_SQL_DRAFT_KEY);
+    if (!draft?.trim()) {
+      return false;
+    }
+    localStorage.removeItem(AICHAT_SQL_DRAFT_KEY);
+    return this.applyAichatSqlDraft(draft);
+  };
+
+  onAichatRunSql = (event) => {
+    const sql = event?.detail?.sql;
+    if (sql) {
+      void this.applyAichatSqlDraft(sql);
+    }
+  };
+
   createNewScriptFromQueryPath = async (content, context = []) => {
     if (!(await getSupportFlag(SQLRUNNER_TABS_UI)).value) {
       return;
@@ -558,7 +595,7 @@ export class ExplorePageContentWrapper extends PureComponent {
     }
 
     // If the new_query page is loaded without a scriptId, redirect the user to the most
-    // recently used tab in the sql runner session
+    // recently used tab in the sql runner session — unless AI Chat left SQL in localStorage.
     if (
       isTabbableUrl(location) &&
       !location.query?.scriptId &&
@@ -566,9 +603,19 @@ export class ExplorePageContentWrapper extends PureComponent {
       !location.query?.queryPath &&
       !dataset.get("sql")
     ) {
-      this.redirectToLastUsedTab(this.props.router);
+      void (async () => {
+        try {
+          const consumed = await this.consumeAichatSqlDraftFromStorage();
+          if (!consumed) {
+            await this.redirectToLastUsedTab(this.props.router);
+          }
+        } catch {
+          await this.redirectToLastUsedTab(this.props.router);
+        }
+      })();
     }
 
+    window.addEventListener("aichatbot-run-sql", this.onAichatRunSql);
     if (currentSql) {
       this.setState({ currentSqlIsEmpty: false });
     }
@@ -656,6 +703,8 @@ export class ExplorePageContentWrapper extends PureComponent {
   }
 
   componentWillUnmount() {
+    window.removeEventListener("aichatbot-run-sql", this.onAichatRunSql);
+
     Mousetrap.unbind([
       "mod+enter",
       "mod+shift+enter",
