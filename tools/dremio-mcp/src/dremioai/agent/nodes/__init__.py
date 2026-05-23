@@ -5,6 +5,7 @@ from dremioai.agent.nodes.discovery import (
     route_after_pick_schema,
 )
 from dremioai.agent.nodes.guardrail import (
+    make_general_reply_node,
     make_greetings_node,
     make_guardrail_node,
     make_guardrail_reject_node,
@@ -30,6 +31,7 @@ __all__ = [
     "make_error_node",
     "make_execute_node",
     "make_finalize_node",
+    "make_general_reply_node",
     "make_greetings_node",
     "make_guardrail_node",
     "make_guardrail_reject_node",

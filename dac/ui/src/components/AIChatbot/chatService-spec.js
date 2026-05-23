@@ -18,7 +18,6 @@ import { chatService, hasAuthToken } from "./chatService";
 
 describe("AIChatbot chatService (v1 API)", () => {
   beforeEach(() => {
-    localStorage.removeItem("aichatbot-plugin-sessions");
     localStorage.removeItem("aichatbot-plugin-sql-draft");
     sinon.stub(localStorageUtils, "getAuthToken").returns("_dremio-secrettok");
     sinon.stub(localStorageUtils, "getUserData").returns({});
@@ -36,10 +35,34 @@ describe("AIChatbot chatService (v1 API)", () => {
     }
   });
 
-  it("saves and loads sessions from localStorage", () => {
+  it("saves and loads sessions from Dremio history API", async () => {
     const sessions = [{ id: "s1", messages: [] }];
+    sinon.stub(global, "fetch").callsFake((url, options) => {
+      if (String(url).includes("/api/v3/aichat-history/sessions")) {
+        if (options?.method === "PUT") {
+          return Promise.resolve({
+            ok: true,
+            json: async () => sessions,
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          json: async () => sessions,
+        });
+      }
+      return Promise.reject(new Error(`Unexpected URL: ${url}`));
+    });
+
     chatService.saveSessions(sessions);
-    expect(chatService.loadSessions()).to.deep.equal(sessions);
+    const loaded = await chatService.loadSessionsFromServer();
+
+    expect(loaded).to.deep.equal(sessions);
+    const saveCall = global.fetch
+      .getCalls()
+      .find((c) => c.args[1]?.method === "PUT");
+    expect(saveCall).to.be.ok;
+    expect(saveCall.args[1].headers.Authorization).to.equal("Bearer secrettok");
+    expect(JSON.parse(saveCall.args[1].body)).to.deep.equal(sessions);
   });
 
   it("stores SQL draft", () => {

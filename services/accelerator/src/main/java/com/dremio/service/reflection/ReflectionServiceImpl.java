@@ -32,7 +32,6 @@ import com.dremio.catalog.model.CatalogEntityKey;
 import com.dremio.common.config.SabotConfig;
 import com.dremio.common.exceptions.UserException;
 import com.dremio.common.utils.SqlUtils;
-import com.dremio.config.DremioConfig;
 import com.dremio.context.RequestContext;
 import com.dremio.datastore.api.LegacyKVStoreProvider;
 import com.dremio.exec.catalog.Catalog;

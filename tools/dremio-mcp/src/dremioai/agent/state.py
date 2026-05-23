@@ -35,6 +35,7 @@ class AgentState(TypedDict, total=False):
     # guardrail
     is_safe: bool
     is_greeting: bool
+    is_general: bool
     guardrail_reason: str
 
     # discovery

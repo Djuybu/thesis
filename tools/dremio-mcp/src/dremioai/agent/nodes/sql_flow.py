@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import re
 from typing import Any, Literal
 
@@ -19,6 +20,20 @@ from dremioai.agent.nodes.common import (
 )
 from dremioai.agent.state import AgentState
 from dremioai.agent.tools import get_sql_tool
+
+
+def _schema_has_queryable_fields(schema_text: Any) -> bool:
+    """Return True only when GetSchemaOfTable returned a non-empty fields list."""
+    parsed = schema_text
+    if isinstance(schema_text, str):
+        try:
+            parsed = json.loads(schema_text)
+        except (json.JSONDecodeError, TypeError):
+            return False
+    if not isinstance(parsed, dict):
+        return False
+    fields = parsed.get("fields") or parsed.get("Fields")
+    return isinstance(fields, list) and any(isinstance(field, dict) for field in fields)
 
 
 def make_metadata_confirmation_node():
@@ -74,6 +89,17 @@ def make_sql_gen_node(llm: Any):
     async def sql_gen_node(state: AgentState) -> dict[str, Any]:
         if state.get("error"):
             return {}
+        if not _schema_has_queryable_fields(state.get("schema_text")):
+            table_fqn = state.get("table_fqn") or "selected dataset"
+            _trace("step=sql_gen aborted missing_fields table=%s", table_fqn)
+            return {
+                "error": (
+                    "Khong the sinh SQL an toan vi metadata cua "
+                    f"{table_fqn} khong co danh sach cot (`fields`). "
+                    "Hay format/promote file trong Dremio de schema duoc nhan dien, "
+                    "hoac hoi liet ke cot sau khi Dremio tra ve fields."
+                )
+            }
         _trace("step=sql_gen LLM structured SqlProposal")
         sys = (
             "/no_think\n"

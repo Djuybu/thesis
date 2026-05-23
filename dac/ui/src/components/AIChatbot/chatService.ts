@@ -16,8 +16,8 @@
 import localStorageUtils from "@inject/utils/storageUtils/localStorageUtils";
 import type { ChatApiResponse, ChatSession, ConfigApiResponse } from "./types";
 
-const STORAGE_KEY = "aichatbot-plugin-sessions";
 const SQL_DRAFT_KEY = "aichatbot-plugin-sql-draft";
+const HISTORY_ENDPOINT = "/api/v3/aichat-history/sessions";
 const REQUEST_TIMEOUT_MS = 86_500_000;
 
 let cachedConfig: ConfigApiResponse | null = null;
@@ -99,19 +99,32 @@ async function readErrorMessage(response: Response): Promise<string> {
 }
 
 export const chatService = {
-  loadSessions(): ChatSession[] {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return [];
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
+  async loadSessionsFromServer(): Promise<ChatSession[]> {
+    if (!hasAuthToken()) return [];
+
+    const response = await fetch(HISTORY_ENDPOINT, {
+      method: "GET",
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) {
+      const detail = await readErrorMessage(response);
+      throw new Error(`HTTP ${response.status}: ${detail}`);
     }
+
+    const parsed = await response.json();
+    return Array.isArray(parsed) ? parsed : [];
   },
 
   saveSessions(sessions: ChatSession[]) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+    if (!hasAuthToken()) return;
+
+    fetch(HISTORY_ENDPOINT, {
+      method: "PUT",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(sessions),
+    }).catch(() => {
+      // Chat history persistence should not block the active conversation.
+    });
   },
 
   storeSqlDraft(sql: string) {

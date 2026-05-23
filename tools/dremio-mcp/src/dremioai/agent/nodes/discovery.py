@@ -5,6 +5,7 @@ import json
 import os
 import re
 import time
+import unicodedata
 from typing import Any, Literal
 
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -68,15 +69,42 @@ _SCHEMA_DESCRIBE_RX = re.compile(
     re.I,
 )
 
+_ANALYTICAL_SINGLE_FLOW_ASCII_RX = re.compile(
+    r"\b(?:join|inner\s+join|left\s+join|right\s+join|full\s+join)\b|"
+    r"\b(?:so\s+sanh|compare|correlat)\b|"
+    r"\b(?:aggregate|group\s+by|plot|chart|forecast)\b|"
+    r"\b(?:viet|tao)\s+(?:mot\s+)?(?:cau\s+)?sql\b|"
+    r"\bwrite\s+(?:a\s+)?sql\b",
+    re.I,
+)
+
+_SCHEMA_DESCRIBE_ASCII_RX = re.compile(
+    r"mo\s*ta(?:[^.!?\n]{0,40}?)?\s+(?:cac\s+|nhung\s+|cac\s+loai\s+)?(?:truong|cot|field|column|schema)|"
+    r"liet\s*ke\s+(?:cac\s+)?(?:truong|cot|field|column)|"
+    r"(?:cac|nhung)\s+(?:truong|cot)\s+(?:du\s+lieu\s+)?(?:cua|trong)\b|"
+    r"\b(?:describe|show|list)\s+(?:the\s+)?(?:schema|columns?|fields?|table\s+structure)\b|"
+    r"cau\s*truc\s+(?:bang|du\s+lieu)|"
+    r"co\s+(?:nhung\s+|cac\s+)?(?:truong|cot)\s+(?:gi|nao|trong)",
+    re.I,
+)
+
+
+def _ascii_intent_text(msg: str) -> str:
+    text = unicodedata.normalize("NFKD", msg or "")
+    text = "".join(ch for ch in text if not unicodedata.combining(ch))
+    text = text.replace("\u0111", "d").replace("\u0110", "D")
+    return text.replace("đ", "d").replace("Đ", "D").lower()
+
 
 def user_asks_for_schema_description(q: str) -> bool:
     """True when the user wants a column/field description of ONE table (no SQL needed)."""
     s = q or ""
+    ascii_s = _ascii_intent_text(s)
     if not s.strip():
         return False
-    if _ANALYTICAL_SINGLE_FLOW_RX.search(s):
+    if _ANALYTICAL_SINGLE_FLOW_RX.search(s) or _ANALYTICAL_SINGLE_FLOW_ASCII_RX.search(ascii_s):
         return False
-    return bool(_SCHEMA_DESCRIBE_RX.search(s))
+    return bool(_SCHEMA_DESCRIBE_RX.search(s) or _SCHEMA_DESCRIBE_ASCII_RX.search(ascii_s))
 
 
 def _format_schema_description_answer(schema_text: Any, table_fqn: str) -> str:

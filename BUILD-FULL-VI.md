@@ -178,6 +178,7 @@ Cấu hình Dremio: `conf/dremio.conf` → `services.coordinator.web.aichatbot.p
 |------------|-------------|
 | `apt` / `dpkg` lock (`unattended-upgrades`) | Đợi cập nhật xong; không kill giữa chừng. |
 | Build quá lâu / hết RAM | Dùng máy RAM đủ; hoặc chỉ `-pl` module cần thiết cho tác vụ hiện tại. |
+| `Analyst Center - UI` / `JavaScript heap out of memory` (webpack) | Tăng heap Node trước khi build: `export NODE_OPTIONS=--max-old-space-size=8192` (máy 16 GB RAM trở lên; máy 8 GB thử `6144`). Sau đó: `mvn install -DskipTests -rf :dremio-dac-ui`. Hoặc bỏ qua bundle UI: `mvn install -DskipTests -Ddremio.no-ui=true` (chỉ khi không cần UI trong bản build). |
 | Sai JDK | Đảm bảo `JAVA_HOME` trỏ JDK **21** khi chạy Maven cho repo này. |
 | MCP tools load timeout | Tăng `DREMIO_MCP_TIMEOUT_SECONDS`; kiểm tra dremio-mcp server đang chạy. |
 | Gateway 502 | Kiểm tra Dremio token hợp lệ, dremio-mcp server đang chạy, Ollama sẵn sàng. |

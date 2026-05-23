@@ -123,6 +123,8 @@
         <configuration>
           <environmentVariables>
             <EDITION_TYPE>ce</EDITION_TYPE>
+            <!-- Webpack production build needs more than Node default ~2GB heap -->
+            <NODE_OPTIONS>--max-old-space-size=8192</NODE_OPTIONS>
           </environmentVariables>
         </configuration>
         <executions>

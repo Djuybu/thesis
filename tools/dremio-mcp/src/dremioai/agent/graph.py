@@ -34,6 +34,7 @@ from dremioai.agent.nodes import (
     make_error_node,
     make_execute_node,
     make_finalize_node,
+    make_general_reply_node,
     make_greetings_node,
     make_guardrail_node,
     make_guardrail_reject_node,
@@ -68,6 +69,7 @@ def build_graph(llm: Any, mcp_tools: list[Any]) -> Any:
 
     g.add_node("guardrail", make_guardrail_node(llm))
     g.add_node("greetings", make_greetings_node())
+    g.add_node("general_reply", make_general_reply_node())
     g.add_node("guardrail_reject", make_guardrail_reject_node())
     g.add_node("discovery", make_discovery_node(mcp_tools))
     g.add_node("early_end", make_early_end_node())
@@ -83,10 +85,12 @@ def build_graph(llm: Any, mcp_tools: list[Any]) -> Any:
     g.add_edge(START, "guardrail")
     g.add_conditional_edges("guardrail", route_after_guardrail, {
         "greetings": "greetings",
+        "general_reply": "general_reply",
         "discovery": "discovery",
         "guardrail_reject": "guardrail_reject",
     })
     g.add_edge("greetings", END)
+    g.add_edge("general_reply", END)
     g.add_edge("guardrail_reject", END)
 
     g.add_conditional_edges("discovery", route_after_discovery, {

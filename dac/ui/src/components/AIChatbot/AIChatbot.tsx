@@ -71,6 +71,11 @@ const formatInterruptMessage = (interrupt: HitlInterrupt): string => {
 };
 
 export const AIChatbot = () => {
+  const initialSessionRef = useRef<ChatSession | null>(null);
+  if (!initialSessionRef.current) {
+    initialSessionRef.current = createSession();
+  }
+
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
@@ -86,23 +91,42 @@ export const AIChatbot = () => {
     null,
   );
   const [sqlEditValue, setSqlEditValue] = useState("");
-  const [sessions, setSessions] = useState<ChatSession[]>(() => {
-    const existing = chatService.loadSessions();
-    return existing.length ? existing : [createSession()];
-  });
-  const [activeSessionId, setActiveSessionId] = useState<string>(() => {
-    const existing = chatService.loadSessions();
-    return existing[0]?.id || createSession().id;
-  });
+  const [sessions, setSessions] = useState<ChatSession[]>(() => [
+    initialSessionRef.current as ChatSession,
+  ]);
+  const [activeSessionId, setActiveSessionId] = useState<string>(
+    () => (initialSessionRef.current as ChatSession).id,
+  );
   const messagesRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const requestControllerRef = useRef<AbortController | null>(null);
+  const hasLocalHistoryChangesRef = useRef(false);
 
   const activeSession = useMemo(
     () =>
       sessions.find((session) => session.id === activeSessionId) || sessions[0],
     [activeSessionId, sessions],
   );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    chatService
+      .loadSessionsFromServer()
+      .then((existing) => {
+        if (cancelled || !existing.length) return;
+        if (hasLocalHistoryChangesRef.current) return;
+        setSessions(existing);
+        setActiveSessionId(existing[0].id);
+      })
+      .catch(() => {
+        // Keep the local in-memory welcome session if history cannot be loaded.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (messagesRef.current) {
@@ -127,6 +151,7 @@ export const AIChatbot = () => {
     sessionId: string,
     updater: (session: ChatSession) => ChatSession,
   ) => {
+    hasLocalHistoryChangesRef.current = true;
     setSessions((prev) => {
       const next = prev.map((session) =>
         session.id === sessionId ? updater(session) : session,
@@ -166,6 +191,7 @@ export const AIChatbot = () => {
 
   const onCreateSession = () => {
     const session = createSession();
+    hasLocalHistoryChangesRef.current = true;
     setSessions((prev) => {
       const next = [session, ...prev];
       chatService.saveSessions(next);
