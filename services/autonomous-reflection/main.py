@@ -5,7 +5,6 @@ import os
 import joblib
 import pandas as pd
 import json
-import time
 import numpy as np
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request
@@ -21,35 +20,6 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s - %(message)s",
 )
 logging.getLogger("ingest_service").setLevel(logging.INFO)
-
-_DEBUG_LOG_PATH = "/home/djuybu/thesis/.cursor/debug-205876.log"
-_DEBUG_SESSION = "205876"
-
-
-def _agent_debug_log(
-    hypothesis_id: str,
-    location: str,
-    message: str,
-    data: dict,
-    run_id: str = "pre-fix",
-) -> None:
-    # #region agent log
-    try:
-        payload = {
-            "sessionId": _DEBUG_SESSION,
-            "runId": run_id,
-            "hypothesisId": hypothesis_id,
-            "location": location,
-            "message": message,
-            "data": data,
-            "timestamp": int(time.time() * 1000),
-        }
-        with open(_DEBUG_LOG_PATH, "a", encoding="utf-8") as _df:
-            _df.write(json.dumps(payload, default=str) + "\n")
-    except Exception:
-        pass
-    # #endregion
-
 
 # Dremio AccelCreateReflectionHandler: SUM only on numeric (SqlTypeFamily.NUMERIC / ANY);
 # CHARACTER / TIMESTAMP / etc. allow APPROX_COUNT_DISTINCT, COUNT, MIN, MAX (default COUNT).
@@ -215,6 +185,32 @@ class ReflectionBrain:
                 info = self.knowledge_base[matched_name]
                 label = "Dimension" if info['dim_score'] >= info['mea_score'] else "Measure"
                 confidence = max_score
+                # #region agent log
+                upper_entry = self.knowledge_base.get(col.upper())
+                ingest_service._agent_debug_log(
+                    "main.py:predict_reflection:match",
+                    "predict_matched_kb_entry",
+                    {
+                        "queryColumn": col,
+                        "matchedWith": matched_name,
+                        "dim_score": info.get("dim_score"),
+                        "mea_score": info.get("mea_score"),
+                        "suggested_type": label,
+                        "similarity": confidence,
+                        "ingestKeyExact": col in self.knowledge_base,
+                        "ingestKeyUpperExists": upper_entry is not None,
+                        "ingestUpperScores": (
+                            {
+                                "dim_score": upper_entry.get("dim_score"),
+                                "mea_score": upper_entry.get("mea_score"),
+                            }
+                            if upper_entry
+                            else None
+                        ),
+                    },
+                    "F",
+                )
+                # #endregion
             else:
                 label = "None"
                 confidence = 0.0
@@ -301,14 +297,6 @@ async def predict_schema(req: PredictionRequest):
     model = ml_models.get('brain')
     col_names = [c.name for c in req.columns]
     type_by_col = _column_type_index(req.columns)
-    # #region agent log
-    _agent_debug_log(
-        "H1",
-        "main.py:predict_schema:entry",
-        "predict_schema columns and types",
-        {"datasetPath": req.datasetPath, "typeByCol": type_by_col, "brainLoaded": model is not None},
-    )
-    # #endregion
 
     if model is None:
         dimensions = [c.name for c in req.columns if c.type in ("VARCHAR", "BOOLEAN", "TIMESTAMP")]
@@ -360,19 +348,6 @@ async def predict_schema(req: PredictionRequest):
 
                 sql_t = type_by_col.get(col_name, "")
                 adjusted = _adjust_measure_aggregations(sql_t, agg_list)
-                # #region agent log
-                _agent_debug_log(
-                    "H2",
-                    "main.py:predict_schema:measure",
-                    "measure aggregations before/after type guard",
-                    {
-                        "column": col_name,
-                        "sqlType": sql_t,
-                        "rawAgg": agg_list,
-                        "adjustedAgg": adjusted,
-                    },
-                )
-                # #endregion
 
                 measures.append(MeasurePrediction(name=col_name, aggregations=adjusted))
                 
@@ -411,6 +386,12 @@ async def post_knowledge_ingest(body: IngestRequest, request: Request):
     _verify_ingest_token(request)
 
     if ingest_service.is_duplicate(body.batchId):
+        ingest_service._agent_debug_log(
+            "main.py:post_knowledge_ingest:duplicate",
+            "endpoint_duplicate_before_apply",
+            {"batchId": body.batchId},
+            "B",
+        )
         return IngestResponse(
             accepted=True,
             datasetsProcessed=0,
@@ -423,5 +404,16 @@ async def post_knowledge_ingest(body: IngestRequest, request: Request):
         raise HTTPException(status_code=503, detail="Model not loaded; cannot ingest usage data")
 
     result = ingest_service.apply_ingest(brain, body)
+    ingest_service._agent_debug_log(
+        "main.py:post_knowledge_ingest:done",
+        "endpoint_ingest_result",
+        {
+            "batchId": body.batchId,
+            "columnsUpdated": result.columnsUpdated,
+            "skippedDuplicate": result.skippedDuplicate,
+            "knowledgeBaseSize": len(brain.knowledge_base),
+        },
+        "A",
+    )
     ml_models['_last_ingest_batch_id'] = body.batchId
     return result

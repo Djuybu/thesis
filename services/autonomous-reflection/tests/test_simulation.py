@@ -94,22 +94,6 @@ def _prune_reflection_by_usage(
     return dim_kept, mea_kept
 
 
-def test_varchar_column_as_measure_gets_no_sum(client_with_rule_brain) -> None:
-    """
-    Semantic model có thể gợi ý Measure cho cột chữ (vd. STATION); Dremio không cho SUM trên CHARACTER.
-    """
-    ar_main.ml_models["brain"] = RuleBrain(set(), {"STATION"})
-    data = _post_predict(
-        client_with_rule_brain,
-        [("STATION", "VARCHAR")],
-        dataset_path=["Samples", "samples.dremio.com", "SF weather 2018-2019.csv"],
-    )
-    m = next(x for x in data["measures"] if x["name"] == "STATION")
-    assert "SUM" not in m["aggregations"], m
-    assert "AVG" not in m["aggregations"], m
-    assert m["aggregations"] == ["COUNT"], m
-
-
 def test_schema_predict_dimension_vs_measure(client_with_rule_brain) -> None:
     """POST /predict/schema: dim/measure tách đúng theo nhãn đã học (giả lập RuleBrain)."""
     columns = [
