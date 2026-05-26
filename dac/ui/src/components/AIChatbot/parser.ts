@@ -32,15 +32,44 @@ const parseSqlBlocks = (raw: string): string[] => {
   return blocks;
 };
 
-const parseTableRows = (raw: string): DataRow[] => {
-  try {
-    const maybeArray = JSON.parse(raw);
-    if (!Array.isArray(maybeArray)) return [];
-    if (!maybeArray.every((row) => row && typeof row === "object")) return [];
-    return maybeArray as DataRow[];
-  } catch {
-    return [];
+const isRowArray = (value: unknown): value is DataRow[] =>
+  Array.isArray(value) &&
+  value.length > 0 &&
+  value.every((row) => row && typeof row === "object" && !Array.isArray(row));
+
+/** Normalize gateway ``execution_result`` (array or ``{"result":[...]}`` JSON string). */
+export const extractExecutionRows = (raw: unknown): DataRow[] => {
+  if (raw == null) return [];
+
+  let parsed: unknown = raw;
+  if (typeof raw === "string") {
+    const trimmed = raw.trim();
+    if (!trimmed) return [];
+    try {
+      parsed = JSON.parse(trimmed);
+    } catch {
+      return [];
+    }
   }
+
+  if (isRowArray(parsed)) {
+    return parsed;
+  }
+
+  if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+    const wrapper = parsed as Record<string, unknown>;
+    if (wrapper.error) return [];
+    const result = wrapper.result ?? wrapper.rows;
+    if (isRowArray(result)) {
+      return result;
+    }
+  }
+
+  return [];
+};
+
+const parseTableRows = (raw: string): DataRow[] => {
+  return extractExecutionRows(raw);
 };
 
 export const parseMessageContent = (

@@ -22,6 +22,7 @@ import { chatService, hasAuthToken } from "./chatService";
 import {
   createSession,
   deriveSessionTitle,
+  extractExecutionRows,
   parseMessageContent,
   uid,
 } from "./parser";
@@ -36,12 +37,47 @@ import * as classes from "./AIChatbot.module.less";
 import { MessageActionBar } from "./MessageActionBar";
 
 const MAX_PROMPT_LENGTH = 2000;
+const MAX_TABLE_PREVIEW_ROWS = 10;
 const SOFT_PROMPT_LIMIT = 1600;
 const QUICK_PROMPTS = [
   "Tóm tắt bảng dữ liệu và cột quan trọng.",
   "Viết câu SQL để đếm số bản ghi theo ngày.",
   "Giải thích lỗi SQL và đề xuất cách sửa.",
 ];
+
+const formatTimingFooter = (payload: ChatApiResponse): string => {
+  const parts: string[] = [];
+  if (payload.elapsed_ms != null && payload.elapsed_ms >= 0) {
+    parts.push(`⏱ **${(payload.elapsed_ms / 1000).toFixed(1)}s** (agent)`);
+  }
+  const tok = payload.token_usage;
+  if (tok && (tok.total_tokens || tok.input_tokens || tok.output_tokens)) {
+    parts.push(
+      `tokens: **${tok.total_tokens || tok.input_tokens + tok.output_tokens}** (in ${tok.input_tokens} / out ${tok.output_tokens})`,
+    );
+  }
+  const steps = payload.step_timings_ms;
+  if (steps?.finalize != null) {
+    parts.push(`tóm tắt: ${(steps.finalize / 1000).toFixed(1)}s`);
+  }
+  if (steps?.sql_gen != null) {
+    parts.push(`SQL gen: ${(steps.sql_gen / 1000).toFixed(1)}s`);
+  }
+  const stepTok = payload.step_token_usage;
+  if (stepTok?.finalize?.total_tokens) {
+    parts.push(`tokens tóm tắt: ${stepTok.finalize.total_tokens}`);
+  }
+  if (stepTok?.sql_gen?.total_tokens) {
+    parts.push(`tokens SQL: ${stepTok.sql_gen.total_tokens}`);
+  }
+  if (!parts.length) return "";
+  return `\n\n---\n*${parts.join(" · ")}*`;
+};
+
+const appendTimingToRaw = (raw: string, payload: ChatApiResponse) => {
+  const footer = formatTimingFooter(payload);
+  return footer ? `${raw}${footer}` : raw;
+};
 
 const pickAnswerText = (payload: ChatApiResponse) => {
   if (payload.answer && payload.answer.trim()) return payload.answer;
@@ -260,7 +296,10 @@ export const AIChatbot = () => {
         ...s,
         threadId: payload.thread_id,
       }));
-      const raw = formatInterruptMessage(interrupt);
+      const raw = appendTimingToRaw(
+        formatInterruptMessage(interrupt),
+        payload,
+      );
       const messageId = uid();
       setInterruptMessageId(messageId);
       appendMessage(activeSession.id, {
@@ -274,10 +313,8 @@ export const AIChatbot = () => {
       setPendingInterrupt(null);
       setPendingThreadId(null);
       setInterruptMessageId(null);
-      const raw = pickAnswerText(payload);
-      const dataRows: DataRow[] = Array.isArray(payload.execution_result)
-        ? payload.execution_result
-        : [];
+      const raw = appendTimingToRaw(pickAnswerText(payload), payload);
+      const dataRows: DataRow[] = extractExecutionRows(payload.execution_result);
       appendMessage(activeSession.id, {
         id: uid(),
         role: "assistant",
@@ -552,32 +589,44 @@ export const AIChatbot = () => {
                           </div>
                         ))}
                       {message.parsed.tableRows.length > 0 && (
-                        <table className={classes.table}>
-                          <thead>
-                            <tr>
-                              {Object.keys(message.parsed.tableRows[0]).map(
-                                (key) => (
-                                  <th key={key}>{key}</th>
-                                ),
-                              )}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {message.parsed.tableRows
-                              .slice(0, 6)
-                              .map((row, index) => (
-                                <tr key={`${message.id}-row-${index}`}>
-                                  {Object.keys(message.parsed.tableRows[0]).map(
-                                    (key) => (
-                                      <td key={`${message.id}-${index}-${key}`}>
+                        <div className={classes.resultTableWrap}>
+                          <div className={classes.resultTableMeta}>
+                            Kết quả truy vấn — hiển thị{" "}
+                            {Math.min(
+                              MAX_TABLE_PREVIEW_ROWS,
+                              message.parsed.tableRows.length,
+                            )}
+                            /{message.parsed.tableRows.length} dòng
+                          </div>
+                          <table className={classes.table}>
+                            <thead>
+                              <tr>
+                                {Object.keys(message.parsed.tableRows[0]).map(
+                                  (key) => (
+                                    <th key={key}>{key}</th>
+                                  ),
+                                )}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {message.parsed.tableRows
+                                .slice(0, MAX_TABLE_PREVIEW_ROWS)
+                                .map((row, index) => (
+                                  <tr key={`${message.id}-row-${index}`}>
+                                    {Object.keys(
+                                      message.parsed.tableRows[0],
+                                    ).map((key) => (
+                                      <td
+                                        key={`${message.id}-${index}-${key}`}
+                                      >
                                         {String(row[key] ?? "")}
                                       </td>
-                                    ),
-                                  )}
-                                </tr>
-                              ))}
-                          </tbody>
-                        </table>
+                                    ))}
+                                  </tr>
+                                ))}
+                            </tbody>
+                          </table>
+                        </div>
                       )}
                       {isPendingHitlMessage && pendingInterrupt && (
                         <div className={classes.hitlActions}>

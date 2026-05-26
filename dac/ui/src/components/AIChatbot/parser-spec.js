@@ -16,6 +16,7 @@
 import {
   createSession,
   deriveSessionTitle,
+  extractExecutionRows,
   parseMessageContent,
 } from "./parser";
 
@@ -32,6 +33,21 @@ describe("AIChatbot parser", () => {
     const parsed = parseMessageContent('[{"name":"a","count":1}]');
     expect(parsed.tableRows).to.have.length(1);
     expect(parsed.tableRows[0]).to.deep.equal({ name: "a", count: 1 });
+  });
+
+  it("extracts rows from RunSqlQuery result wrapper", () => {
+    const rows = extractExecutionRows({
+      result: [{ fare_amount: "99.75", pickup_datetime: "2014-11-11" }],
+    });
+    expect(rows).to.have.length(1);
+    expect(rows[0].fare_amount).to.equal("99.75");
+  });
+
+  it("extracts rows from JSON string wrapper", () => {
+    const rows = extractExecutionRows(
+      '{"result":[{"fare_amount":"1"}]}',
+    );
+    expect(rows).to.have.length(1);
   });
 
   it("derives session title from first user message", () => {

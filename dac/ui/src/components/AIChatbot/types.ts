@@ -63,6 +63,19 @@ export type ChatApiResponse = {
   answer?: string;
   execution_result?: unknown;
   error?: string;
+  /** Wall-clock time for this agent run (gateway), milliseconds */
+  elapsed_ms?: number;
+  /** Per LangGraph node, milliseconds (e.g. finalize, sql_gen, execute) */
+  step_timings_ms?: Record<string, number>;
+  token_usage?: {
+    input_tokens: number;
+    output_tokens: number;
+    total_tokens: number;
+  };
+  step_token_usage?: Record<
+    string,
+    { input_tokens: number; output_tokens: number; total_tokens: number }
+  >;
 };
 
 export type ConfigApiResponse = {

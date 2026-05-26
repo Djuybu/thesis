@@ -72,6 +72,10 @@ và **MCP server Python** (`tools/dremio-mcp/src/dremioai/servers/mcp.py`):
 
    Log **quy trình agent** (bước graph, route, MCP tool): mặc định bật các dòng `[agent] step=…`. Tắt: `export AGENT_TRACE_LOG=0`.
 
+   **Thời gian & token** (so sánh model trong báo cáo): sau mỗi request log `elapsed_ms`, `token_usage`, `step_timings_ms`. Xem [services/chatbot/MODEL-COMPARISON-VI.md](../../../services/chatbot/MODEL-COMPARISON-VI.md). Tắt token: `AGENT_TOKEN_USAGE=0`.
+
+   **File JSONL** (một dòng / mỗi lần hỏi hoặc resume): `services/chatbot/logs/agent-runs.jsonl` — bật mặc định qua `./run-gateway.sh` (`AGENT_RUN_LOG=1`). Phân tích bằng `jq` hoặc pandas.
+
 6. **Kiểm tra:**
 
    ```bash

@@ -8,6 +8,14 @@ from typing import Any, Literal
 from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.types import interrupt
 
+from dremioai.agent.locale import (
+    answer_looks_english_not_vietnamese,
+    finalize_system_message,
+    finalize_user_message,
+    hitl_metadata_message,
+    hitl_sql_approval_message,
+    user_prefers_vietnamese,
+)
 from dremioai.agent.nodes.common import (
     SqlProposal,
     _agent_trace_llm_content_on,
@@ -63,7 +71,7 @@ def make_metadata_confirmation_node():
         # #endregion
         payload = {
             "action": "metadata_confirmation",
-            "message": "Review discovered tables and schema before SQL generation.",
+            "message": hitl_metadata_message(),
             "table_fqn": state.get("table_fqn"),
             "schema_text": (state.get("schema_text") or "")[:4000],
             "discover_excerpt": (state.get("discover_result") or "")[:4000],
@@ -169,7 +177,7 @@ def make_refinement_node():
         )
         payload = {
             "action": "sql_approval",
-            "message": "Review the proposed SQL before execution on Dremio.",
+            "message": hitl_sql_approval_message(),
             "table_fqn": state.get("table_fqn"),
             "proposed_sql": state.get("proposed_sql"),
             "rationale": state.get("sql_rationale"),
@@ -223,39 +231,56 @@ def make_finalize_node(llm: Any):
     """Summarises query results into a user-friendly response."""
 
     async def finalize_node(state: AgentState) -> dict[str, Any]:
-        if state.get("assistant_answer"):
+        if state.get("assistant_answer") and state.get("execution_raw") is None:
             return {}
         _trace("step=finalize LLM summarize results")
         raw = state.get("execution_raw")
-        sys = "/no_think\nSummarize the query result for the user in concise language. If there is an error field, explain it."
+        uq = state.get("user_question") or ""
         result_json = _json_compact(raw, 8000)
-        msg = (
-            f"User question:\n{state['user_question']}\n\n"
-            f"SQL:\n{state.get('final_sql')}\n\n"
-            f"Result:\n{result_json}"
-        )
-        _trace_verbose(
-            "step=finalize prompt_chars sys=%s user=%s result=%s",
-            len(sys),
-            len(state.get("user_question") or ""),
-            len(result_json),
-        )
-        if _agent_trace_llm_content_on():
-            _trace_verbose("step=finalize prompt_sys=%s", _preview(sys, 600))
-            _trace_verbose("step=finalize prompt_user=%s", _preview(msg, 1500))
-        try:
-            resp = await llm.ainvoke([SystemMessage(content=sys), HumanMessage(content=msg)])
+        final_sql = state.get("final_sql")
+
+        async def _invoke_finalize(*, retry: bool) -> str:
+            sys = finalize_system_message(uq, retry=retry)
+            msg = finalize_user_message(
+                user_question=uq,
+                final_sql=final_sql,
+                result_json=result_json,
+            )
+            _trace_verbose(
+                "step=finalize prompt_chars sys=%s user=%s result=%s retry=%s",
+                len(sys),
+                len(uq),
+                len(result_json),
+                retry,
+            )
+            if _agent_trace_llm_content_on():
+                _trace_verbose("step=finalize prompt_sys=%s", _preview(sys, 600))
+                _trace_verbose("step=finalize prompt_user=%s", _preview(msg, 1500))
+            resp = await llm.ainvoke(
+                [SystemMessage(content=sys), HumanMessage(content=msg)]
+            )
             text = getattr(resp, "content", None) or str(resp)
             if isinstance(text, list):
                 text = " ".join(str(x) for x in text)
-            ans = str(text).strip()
+            return str(text).strip()
+
+        try:
+            ans = await _invoke_finalize(retry=False)
+            if user_prefers_vietnamese(uq) and answer_looks_english_not_vietnamese(ans):
+                _trace("step=finalize retry Vietnamese (model answered in English)")
+                ans = await _invoke_finalize(retry=True)
             if _agent_trace_llm_content_on():
-                _trace_verbose("step=finalize raw_response=%s", _preview(str(resp.content), 1200))
+                _trace_verbose("step=finalize raw_response=%s", _preview(ans, 1200))
             _trace("step=finalize done answer_chars=%s", len(ans))
             return {"assistant_answer": ans}
         except Exception as e:
             _trace("step=finalize error %s", e)
-            return {"assistant_answer": f"Query ran but summarization failed: {e!s}. Raw: {_json_compact(raw, 2000)}"}
+            return {
+                "assistant_answer": (
+                    f"Truy vấn đã chạy nhưng không tóm tắt được kết quả: {e!s}. "
+                    f"Dữ liệu thô: {_json_compact(raw, 2000)}"
+                )
+            }
 
     return finalize_node
 

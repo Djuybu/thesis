@@ -53,6 +53,12 @@ class ChatResumeRequest(BaseModel):
     payload: dict[str, Any] | None = None
 
 
+class TokenUsage(BaseModel):
+    input_tokens: int = 0
+    output_tokens: int = 0
+    total_tokens: int = 0
+
+
 class ChatResponse(BaseModel):
     status: Literal["interrupted", "completed", "error"]
     thread_id: str
@@ -62,12 +68,18 @@ class ChatResponse(BaseModel):
     answer: str | None = None
     execution_result: Any | None = None
     error: str | None = None
+    elapsed_ms: int | None = None
+    step_timings_ms: dict[str, int] | None = None
+    token_usage: TokenUsage | None = None
+    step_token_usage: dict[str, TokenUsage] | None = None
 
 
 class ConfigResponse(BaseModel):
     service: str = "dremio-sql-agent"
     version: str = "1.0.0"
     default_model: str = ""
+    llm_provider: str = "ollama"
+    api_key_configured: bool = False
     hitl_enabled: bool = True
     guardrail_enabled: bool = True
     mcp_configured: bool = False

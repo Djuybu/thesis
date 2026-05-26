@@ -237,7 +237,7 @@ def make_guardrail_reject_node():
     def guardrail_reject_node(state: AgentState) -> dict[str, Any]:
         reason = state.get("guardrail_reason", "Out of domain or unsafe request.")
         _trace("step=guardrail_reject reason=%s", _preview(str(reason), 200))
-        return {"assistant_answer": f"Yeu cau nam ngoai pham vi hoac khong an toan: {reason}"}
+        return {"assistant_answer": f"Yêu cầu nằm ngoài phạm vi hoặc không an toàn: {reason}"}
 
     return guardrail_reject_node
 
